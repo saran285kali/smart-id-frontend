@@ -1,0 +1,92 @@
+import { useState, useEffect } from "react";
+import { useNavigate, Navigate } from "react-router-dom";
+import { useSession } from "../../context/SessionContext";
+import { useEmergency } from "../../context/EmergencyContext";
+
+export default function EmergencyNFC() {
+    const navigate = useNavigate();
+    const { patient } = useSession();
+    const { emergency } = useEmergency();
+    const [isScanning, setIsScanning] = useState(true);
+
+    useEffect(() => {
+        if (!emergency?.active) {
+            navigate("/hospital");
+        }
+    }, [emergency, navigate]);
+
+    const handleNFCTap = () => {
+        // Simulate detecting the NFC card that was already tapped to start the session
+        setIsScanning(false);
+        setTimeout(() => {
+            navigate("/hospital/clinical-note");
+        }, 1500);
+    };
+
+    if (!patient || !emergency?.active) return null;
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-red-950/20 backdrop-blur-md p-4">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-red-100 dark:border-red-900/30 overflow-hidden animate-in zoom-in-95 duration-300">
+                <div className="p-10 text-center">
+                    <div className={`mx-auto size-24 bg-red-50 dark:bg-red-950 rounded-3xl flex items-center justify-center mb-8 border border-red-100 dark:border-red-800 relative ${isScanning ? 'animate-pulse' : ''}`}>
+                        <span className={`material-symbols-outlined text-6xl transition-all duration-500 ${isScanning ? 'text-red-500' : 'text-emerald-500'}`}>
+                            contactless
+                        </span>
+                        {isScanning && (
+                            <div className="absolute top-0 left-0 w-full h-1 bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.8)] animate-scan-line rounded-full"></div>
+                        )}
+                    </div>
+
+                    <h2 className="text-3xl font-bold text-slate-800 dark:text-white">Verify Patient Card</h2>
+                    <p className="text-slate-500 dark:text-slate-400 mt-3 text-lg">
+                        Override authorized for <span className="text-red-600 font-bold">{patient.name}</span>.
+                        <br />
+                        <span className="text-sm font-medium">Please ensure the patient's Smart-ID card is in range to synchronize emergency records.</span>
+                    </p>
+                </div>
+
+                <div className="px-10 pb-10">
+                    {isScanning ? (
+                        <button
+                            onClick={handleNFCTap}
+                            className="w-full py-5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-lg rounded-2xl transition-all shadow-xl flex items-center justify-center gap-3"
+                        >
+                            <span className="material-symbols-outlined">sensors</span>
+                            Simulate Card Detection
+                        </button>
+                    ) : (
+                        <div className="py-5 bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-500 rounded-2xl flex items-center justify-center gap-3 text-emerald-700 dark:text-emerald-400 font-bold animate-in fade-in zoom-in-95">
+                            <span className="material-symbols-outlined">check_circle</span>
+                            Card Verified. Accessing Records...
+                        </div>
+                    )}
+
+                    <button
+                        onClick={() => navigate("/hospital")}
+                        className="w-full mt-6 text-slate-400 font-bold hover:text-red-500 transition-all text-sm uppercase tracking-widest"
+                    >
+                        Cancel Override
+                    </button>
+                </div>
+
+                <div className="bg-red-50 dark:bg-red-900/10 p-6 border-t border-red-100 dark:border-red-800 flex items-center gap-4">
+                    <span className="material-symbols-outlined text-red-500">priority_high</span>
+                    <p className="text-[11px] text-red-700 dark:text-red-300 font-bold uppercase tracking-wider leading-relaxed">
+                        Emergency session will expire in 15 minutes. All writes must be completed within this window to maintain statutory compliance.
+                    </p>
+                </div>
+            </div>
+
+            <style>{`
+        @keyframes scan-line {
+          0% { top: 0; }
+          100% { top: 100%; }
+        }
+        .animate-scan-line {
+          animation: scan-line 2s linear infinite;
+        }
+      `}</style>
+        </div>
+    );
+}
