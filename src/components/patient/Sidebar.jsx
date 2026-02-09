@@ -19,6 +19,10 @@ export default function Sidebar() {
                         <span className="material-symbols-outlined text-xl">history_edu</span>
                         <span>Audit Log</span>
                     </NavLink>
+                    <NavLink to="/patient/insurance" className={linkClass}>
+                        <span className="material-symbols-outlined text-xl">policy</span>
+                        <span>Insurance Schemes</span>
+                    </NavLink>
                 </nav>
 
                 <div className="mt-8 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">

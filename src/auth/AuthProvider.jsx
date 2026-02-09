@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { jwtDecode } from "jwt-decode";
+import { createContext, useContext, useState, useEffect } from "react";
 import tokenService from "../services/token.service";
+import { jwtDecode } from "jwt-decode";
 
 export const AuthContext = createContext(null);
 
@@ -8,47 +8,39 @@ export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Initialize auth from token
-    useEffect(() => {
+    const hydrateUserFromToken = () => {
         const token = tokenService.get();
-
-        if (!token) {
-            setLoading(false);
-            return;
-        }
+        if (!token) return null;
 
         try {
             const decoded = jwtDecode(token);
-
-            if (!decoded?.role || !decoded?.id) {
+            if (!decoded?.id || !decoded?.role) {
                 tokenService.clear();
-                setLoading(false);
-                return;
+                return null;
             }
-
-            setUser({
+            return {
                 id: decoded.id,
                 role: decoded.role,
-                exp: decoded.exp
-            });
+                name: decoded.name || null
+            };
         } catch (err) {
-            console.error("JWT decode failed", err);
+            console.error("Token decoding failed:", err);
             tokenService.clear();
+            return null;
         }
+    };
 
+    useEffect(() => {
+        setUser(hydrateUserFromToken());
         setLoading(false);
     }, []);
 
-    // 🔐 Login MUST trust backend JWT, not frontend role
     const login = (token) => {
         tokenService.set(token);
-
-        const decoded = jwtDecode(token);
-        setUser({
-            id: decoded.id,
-            role: decoded.role,
-            exp: decoded.exp
-        });
+        const decodedUser = hydrateUserFromToken();
+        setUser(decodedUser);
+        console.log("AuthProvider: Login successful", decodedUser);
+        return decodedUser; // Returning user for immediate navigation
     };
 
     const logout = () => {
@@ -63,5 +55,6 @@ export function AuthProvider({ children }) {
     );
 }
 
-// helper hook
 export const useAuth = () => useContext(AuthContext);
+
+export default AuthProvider;

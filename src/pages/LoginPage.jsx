@@ -1,13 +1,16 @@
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { useAuth } from "../auth/useAuth"
 import api from "../services/api"
 import patientApi from "../api/patient.api"
 
 function LoginPage() {
     const { login } = useAuth()
+    const navigate = useNavigate()
     const [activeTab, setActiveTab] = useState("patient")
     const [otpSent, setOtpSent] = useState(false)
     const [loading, setLoading] = useState(false)
+    const [showPassword, setShowPassword] = useState(false)
 
     // Patient Logic
     const [patientAuth, setPatientAuth] = useState({
@@ -43,10 +46,14 @@ function LoginPage() {
         setLoading(true)
         try {
             const res = await patientApi.verifyOtp(patientAuth.phone, patientAuth.otp)
-            login(res.data.token)
+            const loggedUser = login(res.data.token)
+
+            if (loggedUser?.role) {
+                navigate(`/${loggedUser.role.replace('_', '-')}`, { replace: true })
+            }
         } catch (err) {
-            console.error(err)
-            alert("Invalid OTP")
+            console.error("OTP Verification Error:", err)
+            alert("Invalid OTP or connection error")
         } finally {
             setLoading(false)
         }
@@ -54,11 +61,22 @@ function LoginPage() {
 
     const handleHospitalLogin = async (e) => {
         e.preventDefault()
+        if (!hospitalLogin.role || !hospitalLogin.username || !hospitalLogin.password) {
+            return alert("Please fill all fields")
+        }
+        setLoading(true)
         try {
             const res = await api.post("/auth/login", hospitalLogin)
-            login(res.data.token)
+            const loggedUser = login(res.data.token)
+
+            if (loggedUser?.role) {
+                navigate(`/${loggedUser.role.replace('_', '-')}`, { replace: true })
+            }
         } catch (err) {
-            alert(err.response?.data?.message || "Login failed")
+            console.error("Hospital Login Error:", err)
+            alert(err.response?.data?.message || "Authentication failed")
+        } finally {
+            setLoading(false)
         }
     }
 
@@ -68,7 +86,7 @@ function LoginPage() {
             <header className="fixed top-0 left-0 right-0 z-50 px-8 py-4 flex justify-between items-center bg-white/80 dark:bg-slate-900/80 backdrop-blur-md">
                 <div className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-primary text-3xl font-bold">local_hospital</span>
-                    <span className="font-bold text-xl tracking-tight">MediPortal</span>
+                    <span className="font-bold text-xl tracking-tight">Health Sync</span>
                 </div>
                 <button
                     onClick={() => document.documentElement.classList.toggle("dark")}
@@ -176,13 +194,24 @@ function LoginPage() {
                                     </div>
                                     <div>
                                         <label className="text-[10px] font-black uppercase tracking-tighter text-slate-400 mb-2 block">Security Token / Password</label>
-                                        <input
-                                            type="password"
-                                            className="w-full px-6 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 outline-none border focus:border-primary/50 transition-all font-medium"
-                                            placeholder="••••••••"
-                                            value={hospitalLogin.password}
-                                            onChange={(e) => setHospitalLogin({ ...hospitalLogin, password: e.target.value })}
-                                        />
+                                        <div className="relative">
+                                            <input
+                                                type={showPassword ? "text" : "password"}
+                                                className="w-full px-6 py-4 rounded-2xl bg-slate-50 dark:bg-slate-800 outline-none border focus:border-primary/50 transition-all font-medium pr-14"
+                                                placeholder="••••••••"
+                                                value={hospitalLogin.password}
+                                                onChange={(e) => setHospitalLogin({ ...hospitalLogin, password: e.target.value })}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowPassword(!showPassword)}
+                                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-primary transition-colors"
+                                            >
+                                                <span className="material-symbols-outlined">
+                                                    {showPassword ? "visibility_off" : "visibility"}
+                                                </span>
+                                            </button>
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="text-[10px] font-black uppercase tracking-tighter text-slate-400 mb-2 block">Authorized Role</label>
@@ -201,9 +230,9 @@ function LoginPage() {
                                     <button
                                         type="submit"
                                         className="w-full bg-slate-900 dark:bg-white dark:text-slate-950 text-white py-4 rounded-2xl font-bold shadow-xl hover:scale-[1.01] transition-all disabled:opacity-50"
-                                        disabled={!hospitalLogin.role}
+                                        disabled={!hospitalLogin.role || loading}
                                     >
-                                        Authenticate Staff
+                                        {loading ? "Authenticating..." : "Authenticate Staff"}
                                     </button>
                                 </form>
                             )}

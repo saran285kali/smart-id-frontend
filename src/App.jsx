@@ -9,7 +9,7 @@ import MedicalShopDashboard from "./pages/medicalShop/Dashboard"
 import PrescriptionViewer from "./pages/medicalShop/PrescriptionViewer"
 import ClinicalNote from "./pages/hospital/ClinicalNote"
 import PatientRoutes from "./routes/PatientRoutes"
-import AdminDashboard from "./pages/admin/Dashboard"
+import AdminRoutes from "./routes/AdminRoutes"
 import HospitalLayout from "./layouts/HospitalLayout"
 import HospitalDashboard from "./pages/hospital/Dashboard"
 import RegisterPatient from "./pages/hospital/register/RegisterPatient"
@@ -119,10 +119,10 @@ function App() {
 
       {/* ADMIN ROUTES */}
       <Route
-        path="/admin"
+        path="/admin/*"
         element={
           <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
-            <AdminDashboard />
+            <AdminRoutes />
           </ProtectedRoute>
         }
       />
@@ -137,6 +137,7 @@ function App() {
         }
       />
 
+      <Route path="/admin-test" element={<div className="p-20 text-white bg-red-600 font-black">ROUTING TEST SUCCESSFUL</div>} />
       <Route path="/unauthorized" element={<div className="p-20 text-center text-red-500 font-bold">Unauthorized Access</div>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
