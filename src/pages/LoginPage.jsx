@@ -31,7 +31,10 @@ function LoginPage() {
     const setupRecaptcha = () => {
         if (!window.recaptchaVerifier) {
             window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
-                "size": "invisible"
+                size: "invisible",
+                callback: () => {
+                    console.log("reCAPTCHA solved");
+                }
             });
         }
     }
