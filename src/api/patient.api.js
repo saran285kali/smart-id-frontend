@@ -17,8 +17,8 @@ const patientApi = {
         const res = await api.post("/patient/auth/otp/send", { phone });
         return res.data;
     },
-    verifyOtp: async (phone, otp) => {
-        const res = await api.post("/patient/auth/otp/verify", { phone, otp });
+    verifyOtp: async (phone, otp, idToken) => {
+        const res = await api.post("/patient/auth/otp/verify", { phone, otp, idToken });
         return res.data;
     }
 };

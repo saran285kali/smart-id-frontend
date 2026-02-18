@@ -1,8 +1,10 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "../auth/useAuth"
 import api from "../services/api"
 import patientApi from "../api/patient.api"
+import { auth } from "../firebase"
+import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth"
 
 function LoginPage() {
     const { login } = useAuth()
@@ -11,6 +13,7 @@ function LoginPage() {
     const [otpSent, setOtpSent] = useState(false)
     const [loading, setLoading] = useState(false)
     const [showPassword, setShowPassword] = useState(false)
+    const [confirmationResult, setConfirmationResult] = useState(null)
 
     // Patient Logic
     const [patientAuth, setPatientAuth] = useState({
@@ -25,16 +28,30 @@ function LoginPage() {
         role: ""
     })
 
+    const setupRecaptcha = () => {
+        if (!window.recaptchaVerifier) {
+            window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
+                "size": "invisible"
+            });
+        }
+    }
+
     const handleSendOtp = async () => {
         if (!patientAuth.phone) return alert("Enter mobile number")
         setLoading(true)
         try {
-            await patientApi.sendOtp(patientAuth.phone)
+            setupRecaptcha()
+            const appVerifier = window.recaptchaVerifier
+            // Ensure phone is in E.164 format
+            const phoneWithCode = patientAuth.phone.startsWith("+") ? patientAuth.phone : `+91${patientAuth.phone}`
+
+            const result = await signInWithPhoneNumber(auth, phoneWithCode, appVerifier)
+            setConfirmationResult(result)
             setOtpSent(true)
         } catch (err) {
-            console.error(err)
-            // For demo: pretend it worked
-            setOtpSent(true)
+            console.error("Firebase OTP Send Error:", err)
+            // Fallback to legacy if needed or alert
+            alert("Security check failed or service unavailable. Please check the console.")
         } finally {
             setLoading(false)
         }
@@ -45,7 +62,14 @@ function LoginPage() {
         if (!patientAuth.otp) return alert("Enter OTP")
         setLoading(true)
         try {
-            const res = await patientApi.verifyOtp(patientAuth.phone, patientAuth.otp)
+            // 1. Verify OTP with Firebase
+            const userCredential = await confirmationResult.confirm(patientAuth.otp)
+            const idToken = await userCredential.user.getIdToken()
+
+            // 2. Exchange Firebase ID Token for Backend Session
+            // Note: Update backend `/patient/auth/otp/verify` to accept Firebase ID Token if possible
+            // For now, we continue with existing patientApi if it handles the flow
+            const res = await patientApi.verifyOtp(patientAuth.phone, patientAuth.otp, idToken)
             const loggedUser = login(res.data.token)
 
             if (loggedUser?.role) {
@@ -53,7 +77,7 @@ function LoginPage() {
             }
         } catch (err) {
             console.error("OTP Verification Error:", err)
-            alert("Invalid OTP or connection error")
+            alert("Invalid code or session expired. Please try again.")
         } finally {
             setLoading(false)
         }
@@ -263,6 +287,8 @@ function LoginPage() {
                     </div>
                 </div>
             </main>
+            {/* Invisible reCAPTCHA Container */}
+            <div id="recaptcha-container"></div>
         </div>
     )
 }
