@@ -28,14 +28,25 @@ function LoginPage() {
         role: ""
     })
 
-    const setupRecaptcha = () => {
-        if (!window.recaptchaVerifier) {
-            window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
-                size: "invisible",
-                callback: () => {
-                    console.log("reCAPTCHA solved");
-                }
-            });
+    const setupRecaptcha = async () => {
+        try {
+            if (!window.recaptchaVerifier) {
+                window.recaptchaVerifier = new RecaptchaVerifier(auth, "recaptcha-container", {
+                    size: "invisible",
+                    callback: (response) => {
+                        console.log("reCAPTCHA solved");
+                    },
+                    "expired-callback": () => {
+                        console.log("reCAPTCHA expired, resetting...");
+                        window.recaptchaVerifier?.clear();
+                        window.recaptchaVerifier = null;
+                        setupRecaptcha();
+                    }
+                });
+                await window.recaptchaVerifier.render();
+            }
+        } catch (err) {
+            console.error("reCAPTCHA Setup Error:", err);
         }
     }
 
@@ -43,18 +54,13 @@ function LoginPage() {
         if (!patientAuth.phone) return alert("Enter mobile number")
         setLoading(true)
         try {
-            setupRecaptcha()
-            const appVerifier = window.recaptchaVerifier
-            // Ensure phone is in E.164 format
-            const phoneWithCode = patientAuth.phone.startsWith("+") ? patientAuth.phone : `+91${patientAuth.phone}`
-
-            const result = await signInWithPhoneNumber(auth, phoneWithCode, appVerifier)
-            setConfirmationResult(result)
+            // Calling the backend API to handle OTP dispatch
+            await patientApi.sendOtp(patientAuth.phone)
             setOtpSent(true)
+            console.log("OTP initialization request sent to backend");
         } catch (err) {
-            console.error("Firebase OTP Send Error:", err)
-            // Fallback to legacy if needed or alert
-            alert("Security check failed or service unavailable. Please check the console.")
+            console.error("Backend OTP Send Error:", err)
+            alert("Failed to send access code. Please verify your number or check connection.")
         } finally {
             setLoading(false)
         }
