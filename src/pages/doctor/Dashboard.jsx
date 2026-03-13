@@ -1,7 +1,7 @@
 import { useState } from "react";
-import doctorApi from "../../api/doctor.api";
+import doctorApi from "../../services/doctor.api";
 import { useNfc } from "../../hooks/useNfc";
-import { saveOfflineScan } from "../../services/db";
+import { saveOfflineScan } from "../../services/db.service";
 
 export default function DoctorDashboard() {
     const [patient, setPatient] = useState(null);

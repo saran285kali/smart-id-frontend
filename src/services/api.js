@@ -1,5 +1,5 @@
 import axios from "axios"
-import { logout } from "../utils/auth"
+import tokenService from "./token.service";
 
 const api = axios.create({
     baseURL: "https://smart-id-backend-x3ug.onrender.com/api", // change later
@@ -9,7 +9,7 @@ const api = axios.create({
 // REQUEST INTERCEPTOR → attach JWT
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem("authToken")
+        const token = tokenService.get();
         if (token) {
             config.headers.Authorization = `Bearer ${token}`
         }
@@ -27,7 +27,7 @@ api.interceptors.response.use(
             (error.response.status === 401 ||
                 error.response.status === 403)
         ) {
-            logout()
+            tokenService.clear();
             alert("Session expired. Please login again.")
             // Using window.location.reload() to force a reset to login state
             window.location.reload()

@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { getPatientEMR } from "../../services/patientApi";
+import patientApi from "../../services/patient.api";
 
 export default function Dashboard() {
     const [emr, setEmr] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        getPatientEMR()
+        patientApi.getPatientEMR()
             .then(res => {
                 setEmr(res.data);
                 setLoading(false);

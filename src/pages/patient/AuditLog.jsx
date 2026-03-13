@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { getPatientAuditLog } from "../../services/patientApi";
+import patientApi from "../../services/patient.api";
 
 export default function AuditLog() {
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        getPatientAuditLog()
+        patientApi.getPatientAuditLog()
             .then(res => {
                 setLogs(res.data);
                 setLoading(false);

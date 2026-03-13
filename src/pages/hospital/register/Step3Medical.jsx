@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { usePatientRegistration } from "../../../context/PatientRegistrationContext";
-import hospitalAPI from "../../../api/management.api";
+import hospitalAPI from "../../../services/management.api";
 import { useNavigate } from "react-router-dom";
 
 import { useAuth } from "../../../auth/AuthProvider";

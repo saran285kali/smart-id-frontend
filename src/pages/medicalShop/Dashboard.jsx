@@ -1,5 +1,5 @@
 import { useState } from "react";
-import medicalShopApi from "../../api/medicalShop.api";
+import medicalShopApi from "../../services/medicalShop.api";
 
 export default function MedicalShopDashboard() {
     const [patient, setPatient] = useState(null);

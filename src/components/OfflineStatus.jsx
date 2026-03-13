@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getPendingScans } from "../services/db";
+import { getPendingScans } from "../services/db.service";
 
 export default function OfflineStatus() {
     const [isOnline, setIsOnline] = useState(navigator.onLine);

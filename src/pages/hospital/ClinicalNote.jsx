@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useSession } from "../../context/SessionContext";
 import { useEmergency } from "../../context/EmergencyContext";
-import hospitalAPI from "../../api/management.api";
+import hospitalAPI from "../../services/management.api";
 
 export default function ClinicalNote() {
     const navigate = useNavigate();

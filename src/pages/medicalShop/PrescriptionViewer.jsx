@@ -1,6 +1,6 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import medicalShopApi from "../../api/medicalShop.api";
+import medicalShopApi from "../../services/medicalShop.api";
 
 export default function PrescriptionViewer() {
     const { id } = useParams();

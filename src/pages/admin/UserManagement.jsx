@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import { getUsers } from "../../services/adminApi";
+import adminApi from "../../services/admin.api";
 
 export default function UserManagement() {
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        getUsers()
+        adminApi.getUsers()
             .then(res => {
                 setUsers(res.data);
                 setLoading(false);

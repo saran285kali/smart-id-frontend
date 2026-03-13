@@ -1,5 +1,5 @@
 import { Outlet } from "react-router-dom";
-import { useAuth } from "../auth/useAuth";
+import { useAuth } from "../auth/AuthProvider";
 import SessionTimeout from "../components/SessionTimeout";
 
 export default function MedicalShopLayout() {

@@ -1,4 +1,4 @@
-import api from "../services/api";
+import api from "./api";
 
 const adminApi = {
     getStatistics: async () => {
@@ -19,6 +19,10 @@ const adminApi = {
     },
     toggleUserStatus: async (userId) => {
         const res = await api.patch(`/admin/users/${userId}/toggle`);
+        return res.data;
+    },
+    savePermissions: async (payload) => {
+        const res = await api.post("/admin/permissions", payload);
         return res.data;
     }
 };

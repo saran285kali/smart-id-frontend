@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { useAuth } from "../auth/useAuth"
+import { useAuth } from "../auth/AuthProvider"
 import api from "../services/api"
-import patientApi from "../api/patient.api"
+import patientApi from "../services/patient.api"
 import { auth } from "../firebase"
 import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth"
 

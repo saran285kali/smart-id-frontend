@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../context/SessionContext';
-import hospitalAPI from '../../api/management.api';
+import hospitalAPI from '../../services/management.api';
 
 export default function HospitalDashboard() {
     const navigate = useNavigate();

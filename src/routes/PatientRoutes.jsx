@@ -1,5 +1,5 @@
 import { Routes, Route } from "react-router-dom";
-import PatientLayout from "../pages/patient/PatientLayout";
+import PatientLayout from "../layouts/PatientLayout";
 import Dashboard from "../pages/patient/Dashboard";
 import AuditLog from "../pages/patient/AuditLog";
 import InsuranceSchemes from "../pages/patient/InsuranceSchemes";
