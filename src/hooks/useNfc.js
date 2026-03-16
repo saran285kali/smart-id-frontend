@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import socket from "../services/socket";
 
 /**
  * useNfc Hook - Handles real Web NFC (Android) and Keyboard-Emulated NFC (Desktop)
@@ -62,7 +63,22 @@ export const useNfc = (onScanSuccess) => {
         }
     }, [onScanSuccess]);
 
-    // 3. SIMULATION TRIGGER (For Dev/Demo)
+    // 3. WEBSOCKET REAL-TIME SCANNER (Raspberry Pi/External hardware)
+    useEffect(() => {
+        const handleWsScan = (data) => {
+            console.log("WebSocket NFC Scan detected:", data.uid);
+            onScanSuccess?.(data.uid);
+            setIsScanning(false);
+        };
+
+        socket.on("nfc_scanned", handleWsScan);
+
+        return () => {
+            socket.off("nfc_scanned", handleWsScan);
+        };
+    }, [onScanSuccess]);
+
+    // This remains to support a manual fallback trigger if needed
     const simulateScan = (mockId = "NFC-SIM-9901") => {
         setIsScanning(true);
         setTimeout(() => {

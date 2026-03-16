@@ -1,4 +1,4 @@
-import { hospitals } from "../../data/hospitalCoverage";
+const hospitals = [];
 import { recommendHospital } from "../../utils/recommendHospital";
 
 export default function RecommendedHospital({ scheme }) {

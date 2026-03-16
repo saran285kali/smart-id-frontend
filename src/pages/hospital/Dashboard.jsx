@@ -33,34 +33,7 @@ export default function HospitalDashboard() {
         };
     }, [setPatient]);
 
-    const onNFCTap = (data) => {
-        if (data.action === "VIEW_PATIENT") {
-            navigate(`/hospital/patients/${data.id}`);
-        }
-
-        if (data.action === "LOG_STAFF_ACTIVITY") {
-            navigate(`/hospital/staff/${data.id}`);
-        }
-    };
-
-    // Leaving manual simulate buttons just in case physical hardware is disconnected,
-    // but the system is now real web-socket driven.
-    const triggerSimulation = async (type) => {
-        if (type === 'patient') {
-            const mockNfcId = "PAT-8821";
-            try {
-                // Fetch limited patient info for management dashboard natively if available
-                const res = await hospitalAPI.getPatientByNfc(mockNfcId);
-                setPatient(res.data);
-            } catch (err) {
-                console.error("NFC Load Failed:", err);
-            }
-        } else {
-            const payload = { type: "staff", id: "STF-4402" };
-            const data = { action: "LOG_STAFF_ACTIVITY", id: payload.id };
-            onNFCTap(data);
-        }
-    };
+    // Only relying on real WebSocket 'patient_data' events now.
 
     return (
         <div className="p-8 space-y-8 bg-slate-50 dark:bg-slate-950 min-h-full">
@@ -83,23 +56,9 @@ export default function HospitalDashboard() {
                         <h3 className="text-2xl font-bold mb-2 text-slate-800 dark:text-emerald-50">
                             NFC Status: Ready / Waiting
                         </h3>
-                        <p className="text-sm text-slate-500 dark:text-emerald-200/60 max-w-md mx-auto mb-6">
-                            Tap a patient card to view records or a staff badge to log activity.
+                        <p className="text-sm text-slate-500 dark:text-emerald-200/60 max-w-md mx-auto">
+                            Please have the patient tap their NFC card on the physical scanner.
                         </p>
-                        <div className="flex justify-center gap-4">
-                            <button
-                                onClick={() => triggerSimulation('patient')}
-                                className="px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-600/20"
-                            >
-                                Simulate Patient Tap
-                            </button>
-                            <button
-                                onClick={() => triggerSimulation('staff')}
-                                className="px-6 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700"
-                            >
-                                Simulate Staff Tap
-                            </button>
-                        </div>
                     </div>
                 ) : (
                     <div className="flex flex-col md:flex-row items-center justify-between gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
