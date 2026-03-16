@@ -1,40 +1,168 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import doctorApi from "../../services/doctor.api";
-import { useNfc } from "../../hooks/useNfc";
 import { saveOfflineScan } from "../../services/db.service";
+import socket from "../../services/socket";
 
 export default function DoctorDashboard() {
     const [patient, setPatient] = useState(null);
     const [isEmergency, setIsEmergency] = useState(false);
 
-    // NFC Hook handles Real Hardware + Simulation
-    const { isScanning, simulateScan } = useNfc(async (nfcId) => {
-        console.log("NFC Scanned in Dashboard:", nfcId);
-
-        try {
-            // Attempt standard online scan
-            const data = await doctorApi.scanNFC({ nfcId, emergency: isEmergency });
-            setPatient(data);
-        } catch (err) {
-            console.warn("Online Scan Failed. Entering Offline Vault Mode.", err);
-
-            // Save to local IndexedDB for later sync
-            await saveOfflineScan({ nfcId, type: isEmergency ? 'emergency' : 'standard' });
-
-            // Provide immediate clinical feedback from local cache or dummy
-            setPatient({
-                id: nfcId,
-                name: isEmergency ? "EMERGENCY: Patient Unknown" : "Aarav Sharma",
-                condition: isEmergency ? "CRITICAL - UNCONSCIOUS" : "Stable - Routine Checkup",
-                lastVisit: "OFFLINE CACHE",
-                bloodGroup: "O+ve",
-                offline: true
-            });
-        }
+    // Authentication Flow states:
+    // idle -> scanning -> fingerprint -> sending_otp -> verify_otp -> success
+    const [step, setStep] = useState('idle');
+    const [scannedUid, setScannedUid] = useState(null);
+    const [otp, setOtp] = useState('');
+    const [phone, setPhone] = useState('');
+    
+    // Hardware Status
+    const [hardware, setHardware] = useState({
+        nfc: "Checking...",
+        fingerprint: "Checking...",
+        gsm: "Checking...",
+        pi: "Checking..."
     });
+
+    useEffect(() => {
+        // Fetch hardware status
+        const fetchStatus = async () => {
+            try {
+                const status = await doctorApi.getDeviceStatus();
+                // Assuming status returns { nfc: "Connected", fingerprint: "Connected", gsm: "Connected", pi: "Online" }
+                setHardware(status || {
+                    nfc: "Connected",
+                    fingerprint: "Connected",
+                    gsm: "Connected",
+                    pi: "Online"
+                });
+            } catch (err) {
+                setHardware({
+                    nfc: "Disconnected",
+                    fingerprint: "Disconnected",
+                    gsm: "Disconnected",
+                    pi: "Offline"
+                });
+            }
+        };
+        fetchStatus();
+
+        // 🟢 Real-time WebSocket Listeners 🟢
+        socket.on("device_status", (status) => {
+            setHardware(status);
+        });
+
+        socket.on("nfc_scanned", (data) => {
+            console.log("NFC Card detected via WebSocket:", data.uid);
+            setStep('scanning'); // Show scanning briefly if it was idle
+            // Advance UI automatically without user click
+            setScannedUid(data.uid);
+            
+            // Short delay to show the scanning animation, then move to fingerprint
+            setTimeout(() => {
+                setStep('fingerprint');
+            }, 600);
+        });
+
+        return () => {
+            socket.off("device_status");
+            socket.off("nfc_scanned");
+        };
+    }, []);
+
+    // Step 1: Trigger NFC Scan (Optional manual fallback)
+    const handleStartScan = async () => {
+        setStep('scanning');
+        try {
+            // In a real-time setup this might just tell the Pi to wake up,
+            // but we can leave the original API call for fallback.
+            const data = await doctorApi.scanNfc();
+            if (data && data.uid) {
+                setScannedUid(data.uid);
+                setStep('fingerprint');
+            }
+        } catch (err) {
+            console.error("NFC Scan Failed", err);
+            // Don't reset to idle if WebSocket might still arrive
+            // setStep('idle');
+            // alert("NFC Scan Failed or Timeout. Please try again or tap card directly.");
+        }
+    };
+
+    // Step 2: Trigger Fingerprint Verification
+    const handleVerifyFingerprint = async () => {
+        try {
+            const data = await doctorApi.verifyFingerprint();
+            if (data.verified) {
+                setStep('sending_otp');
+                
+                // Fetch patient phone based on UID to send OTP
+                const patientData = await doctorApi.getPatientByUid(scannedUid);
+                setPhone(patientData.phone);
+                
+                // Trigger backend to send OTP via SIM800L
+                await doctorApi.sendOtp(patientData.phone);
+                setStep('verify_otp');
+            } else {
+                alert("Fingerprint mismatch. Verification failed.");
+                setStep('idle');
+            }
+        } catch (err) {
+            console.error("Fingerprint Error", err);
+            alert("Fingerprint scanner error.");
+            setStep('idle');
+        }
+    };
+
+    // Step 3: Verify OTP and fetch full data
+    const handleVerifyOtp = async () => {
+        try {
+            const result = await doctorApi.verifyOtp({ phone, otp });
+            if (result.success || result.token || result.verified) { // Depends on backend response
+                setStep('success');
+                // Fetch full real patient data from database
+                const finalPatientData = await doctorApi.getPatientByUid(scannedUid);
+                setPatient(finalPatientData);
+            } else {
+                alert("Invalid OTP");
+            }
+        } catch (err) {
+            console.error("OTP Error", err);
+            alert("OTP Verification Failed");
+        }
+    };
+
+    const resetSession = () => {
+        setStep('idle');
+        setPatient(null);
+        setScannedUid(null);
+        setOtp('');
+        setPhone('');
+    };
 
     return (
         <div className="max-w-4xl mx-auto px-4 pb-20">
+
+            {/* DEVICE STATUS PANEL */}
+            <div className="mb-8 bg-slate-100 dark:bg-slate-900 p-6 rounded-[2rem] border dark:border-slate-800 shadow-sm">
+                <h3 className="text-xs font-black uppercase tracking-widest text-slate-500 mb-4">Hardware Status</h3>
+                <div className="flex flex-wrap gap-4 md:gap-8 text-sm font-bold">
+                    <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${hardware.nfc === 'Connected' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                        NFC Reader: <span className="text-slate-500">{hardware.nfc}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${hardware.fingerprint === 'Connected' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                        Fingerprint: <span className="text-slate-500">{hardware.fingerprint}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${hardware.gsm === 'Connected' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                        GSM Module: <span className="text-slate-500">{hardware.gsm}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded-full ${hardware.pi === 'Online' ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                        Raspberry Pi: <span className="text-slate-500">{hardware.pi}</span>
+                    </div>
+                </div>
+            </div>
 
             {/* ALERT BOX FOR EMERGENCY MODE */}
             {isEmergency && !patient && (
@@ -71,65 +199,111 @@ export default function DoctorDashboard() {
                 </div>
             </div>
 
-            {/* MAIN SCANNER UI */}
-            {!patient ? (
-                <div
-                    onClick={() => simulateScan()}
-                    className={`group relative aspect-video md:aspect-[21/9] rounded-[3rem] border-4 border-dashed transition-all cursor-pointer flex flex-col items-center justify-center text-center overflow-hidden
-                        ${isEmergency
-                            ? "border-red-500/30 bg-red-50/30 dark:bg-red-950/10 hover:border-red-500"
-                            : "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-primary/50"
-                        }
-                    `}
-                >
-                    <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 transition-all group-hover:scale-110 
-                        ${isEmergency ? "bg-red-500 text-white" : "bg-primary/10 text-primary"}
-                    `}>
-                        <span className="material-symbols-outlined text-5xl animate-pulse">
-                            {isEmergency ? "e911_emergency" : "contactless"}
-                        </span>
-                    </div>
+            {/* MAIN AUTHENTICATION & RECORD UI */}
+            {!patient && step !== 'success' ? (
+                <div className="bg-white dark:bg-slate-900 rounded-[3rem] border border-slate-200 dark:border-slate-800 shadow-xl p-10 flex flex-col items-center justify-center text-center overflow-hidden min-h-[400px]">
+                    
+                    {/* STEP 1: IDLE / SCANNING */}
+                    {(step === 'idle' || step === 'scanning') && (
+                        <div className="flex flex-col items-center animate-in fade-in duration-500">
+                            <button
+                                onClick={handleStartScan}
+                                disabled={step === 'scanning'}
+                                className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 transition-all hover:scale-105
+                                    ${step === 'scanning' ? "bg-primary text-white shadow-lg shadow-primary/40 animate-pulse" : "bg-primary/10 text-primary"}
+                                `}
+                            >
+                                <span className="material-symbols-outlined text-5xl">contactless</span>
+                            </button>
+                            <h2 className="text-2xl font-bold mb-2">
+                                {step === 'scanning' ? "Scanning NFC..." : "Tap Patient Smart-ID"}
+                            </h2>
+                            <p className="text-slate-500 font-medium max-w-sm mb-6">
+                                {step === 'scanning' ? "Waiting for Raspberry Pi NFC reader response." : "Hold the NFC card near the reader to extract the patient UID."}
+                            </p>
+                            {step === 'scanning' && (
+                                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                            )}
+                        </div>
+                    )}
 
-                    <h2 className="text-2xl font-bold mb-2">
-                        {isScanning ? "Decrypting Card..." : isEmergency ? "Emergency Tap Required" : "Tap Patient Smart-ID"}
-                    </h2>
-                    <p className="text-slate-500 font-medium px-8 max-w-sm">
-                        {isEmergency
-                            ? "Tap to gain immediate access to vital clinical data and blood group."
-                            : "Securely load patient history and active prescriptions via encrypted NFC link."
-                        }
-                    </p>
+                    {/* STEP 2: FINGERPRINT */}
+                    {step === 'fingerprint' && (
+                        <div className="flex flex-col items-center animate-in slide-in-from-right duration-500">
+                            <div className="w-24 h-24 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center mb-6 animate-pulse">
+                                <span className="material-symbols-outlined text-5xl">fingerprint</span>
+                            </div>
+                            <h2 className="text-2xl font-bold mb-2">Place Finger</h2>
+                            <p className="text-slate-500 font-medium max-w-sm mb-8">
+                                Patient UID verified: <span className="font-bold text-slate-800 dark:text-slate-200">{scannedUid}</span>. Please authorize via biometric scanner.
+                            </p>
+                            <button 
+                                onClick={handleVerifyFingerprint}
+                                className="bg-blue-500 text-white px-8 py-3 rounded-2xl font-bold shadow-lg shadow-blue-500/30 hover:scale-105 transition-all"
+                            >
+                                Trigger Biometric Verification
+                            </button>
+                        </div>
+                    )}
 
-                    {isScanning && (
-                        <div className="absolute inset-0 bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm flex items-center justify-center">
-                            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    {/* STEP 3: SENDING OTP */}
+                    {step === 'sending_otp' && (
+                        <div className="flex flex-col items-center animate-in fade-in duration-500">
+                            <div className="w-24 h-24 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center mb-6 animate-pulse">
+                                <span className="material-symbols-outlined text-5xl">sms</span>
+                            </div>
+                            <h2 className="text-2xl font-bold mb-2">Transmitting OTP...</h2>
+                            <p className="text-slate-500 font-medium max-w-sm mb-6">
+                                Fingerprint verified. Dispatching SMS over GSM Module (SIM800L).
+                            </p>
+                            <div className="w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                    )}
+
+                    {/* STEP 4: VERIFY OTP */}
+                    {step === 'verify_otp' && (
+                        <div className="flex flex-col items-center animate-in slide-in-from-right duration-500 w-full max-w-sm">
+                            <div className="w-20 h-20 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center mb-6">
+                                <span className="material-symbols-outlined text-4xl">domain_verification</span>
+                            </div>
+                            <h2 className="text-2xl font-bold mb-2">Enter OTP</h2>
+                            <p className="text-slate-500 font-medium mb-6 text-center">
+                                Access code was sent to the patient's registered mobile device.
+                            </p>
+                            
+                            <input 
+                                type="text"
+                                placeholder="• • • • • •"
+                                className="w-full text-center tracking-[0.5em] text-2xl font-bold bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl px-6 py-4 mb-6 outline-none focus:border-primary transition-all"
+                                value={otp}
+                                onChange={(e) => setOtp(e.target.value)}
+                            />
+
+                            <button 
+                                onClick={handleVerifyOtp}
+                                className="w-full bg-primary text-white py-4 rounded-2xl font-bold shadow-lg shadow-primary/30 hover:scale-[1.01] transition-all"
+                            >
+                                Authenticate Secure Session
+                            </button>
                         </div>
                     )}
                 </div>
-            ) : (
-                /* PATIENT DETAIL VIEW */
+            ) : patient && (
+                /* PATIENT DETAIL VIEW (REAL DATA) */
                 <div className="animate-in fade-in slide-in-from-bottom-10 duration-700">
                     <div className="bg-white dark:bg-slate-900 rounded-[3rem] p-10 border border-slate-100 dark:border-slate-800 shadow-2xl overflow-hidden relative">
-
-                        {/* Offline Badge */}
-                        {patient.offline && (
-                            <div className="absolute top-6 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-orange-500 text-white rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-lg z-10">
-                                <span className="material-symbols-outlined text-xs">cloud_off</span>
-                                Offline Cached Record
-                            </div>
-                        )}
 
                         <div className="flex items-center gap-8 mb-12 pb-12 border-b dark:border-slate-800 mt-4">
                             <div className={`w-20 h-20 rounded-[2rem] flex items-center justify-center text-white font-black text-2xl shadow-lg
                                 ${isEmergency ? "bg-red-500" : "bg-primary"}
                             `}>
-                                {patient.name.split(' ').map(n => n[0]).join('')}
+                                {patient.name ? patient.name.split(' ').map(n => n[0]).join('') : "P"}
                             </div>
                             <div>
-                                <h2 className="text-3xl font-black tracking-tight">{patient.name}</h2>
+                                <h2 className="text-3xl font-black tracking-tight">{patient.name || "Unknown"}</h2>
                                 <p className="text-slate-500 font-bold flex items-center gap-2">
                                     <span className="material-symbols-outlined text-sm">fingerprint</span>
-                                    ID: {patient.id}
+                                    Health ID: {patient.healthId || patient.id}
                                 </p>
                             </div>
                             {patient.bloodGroup && (
@@ -144,35 +318,33 @@ export default function DoctorDashboard() {
                             <div className="space-y-8">
                                 <div>
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Clinical Condition</label>
-                                    <p className="text-xl font-bold bg-slate-50 dark:bg-slate-800 p-5 rounded-2xl border dark:border-slate-700">{patient.condition}</p>
+                                    <p className="text-xl font-bold bg-slate-50 dark:bg-slate-800 p-5 rounded-2xl border dark:border-slate-700">
+                                        {patient.condition || "Routine Checkup"}
+                                    </p>
                                 </div>
                                 <div className="flex items-center gap-4">
                                     <div className="flex-1">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Source Info</label>
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Data Source</label>
                                         <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 font-bold">
-                                            <span className="material-symbols-outlined text-sm">{patient.offline ? "database" : "public"}</span>
-                                            {patient.offline ? "Local Secure Vault" : "Global Network Sync"}
+                                            <span className="material-symbols-outlined text-sm">cloud_sync</span>
+                                            Global Network Sync (Live from DB)
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="space-y-6">
-                                <div className={`p-6 rounded-[2rem] border transition-all ${patient.offline ? "bg-orange-50/30 border-orange-200 dark:bg-orange-950/10 dark:border-orange-900/30" : "bg-primary/5 dark:bg-primary/10 border-primary/10"}`}>
-                                    <h3 className={`font-bold flex items-center gap-2 mb-4 ${patient.offline ? "text-orange-600" : "text-primary"}`}>
-                                        <span className="material-symbols-outlined">
-                                            {patient.offline ? "history_edu" : "verified_user"}
-                                        </span>
-                                        {patient.offline ? "Offline Persistence" : "Authenticated Session"}
+                                <div className="p-6 rounded-[2rem] border bg-green-50/50 border-green-200 dark:bg-green-950/20 dark:border-green-900/40">
+                                    <h3 className="font-bold flex items-center gap-2 mb-4 text-green-600">
+                                        <span className="material-symbols-outlined">verified_user</span>
+                                        Fully Authenticated Session
                                     </h3>
                                     <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                                        {patient.offline
-                                            ? "Network unavailable. This scan has been added to your secure offline queue and will sync once a connection is re-established."
-                                            : "This session is being recorded. Secure access granted based on your medical practitioner ID."}
+                                        Multifactor authentication (NFC + Bio + OTP) completed successfully. Access to sensitive records is actively logged.
                                     </p>
                                 </div>
                                 <button
-                                    onClick={() => setPatient(null)}
+                                    onClick={resetSession}
                                     className="w-full py-4 text-slate-400 font-bold hover:text-slate-900 dark:hover:text-white transition-all flex items-center justify-center gap-2"
                                 >
                                     <span className="material-symbols-outlined">exit_to_app</span>
@@ -182,7 +354,7 @@ export default function DoctorDashboard() {
                         </div>
 
                         <button className="w-full mt-12 bg-slate-900 dark:bg-white dark:text-slate-950 text-white py-5 rounded-[2rem] font-black text-lg shadow-2xl hover:scale-[1.01] transition-all">
-                            Initiate Care Protocol
+                            View Full Medical History
                         </button>
                     </div>
                 </div>

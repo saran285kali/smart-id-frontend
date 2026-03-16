@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useSession } from "../../context/SessionContext";
 import { useEmergency } from "../../context/EmergencyContext";
+import socket from "../../services/socket";
 
 export default function EmergencyNFC() {
     const navigate = useNavigate();
@@ -13,6 +14,16 @@ export default function EmergencyNFC() {
         if (!emergency?.active) {
             navigate("/hospital");
         }
+        
+        // Listen for real-time NFC events
+        socket.on("nfc_scanned", (data) => {
+            console.log("Emergency NFC Card tap detected via WebSocket:", data.uid);
+            handleNFCTap();
+        });
+
+        return () => {
+            socket.off("nfc_scanned");
+        };
     }, [emergency, navigate]);
 
     const handleNFCTap = () => {
