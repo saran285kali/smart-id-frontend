@@ -1,10 +1,37 @@
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../context/SessionContext';
 import hospitalAPI from '../../services/management.api';
+import socket from '../../services/socket';
 
 export default function HospitalDashboard() {
     const navigate = useNavigate();
     const { patient, setPatient, resetSession } = useSession();
+    const [hardwareStatus, setHardwareStatus] = useState({});
+
+    useEffect(() => {
+        // Listen for real patient DB lookups pushed over WebSockets
+        socket.on("patient_data", (realPatientData) => {
+            setPatient({
+                ...realPatientData,
+                name: realPatientData.fullName || realPatientData.name || "Unknown Patient",
+                id: realPatientData.nfcUuid || realPatientData._id || "Unknown ID",
+                role: "Patient",
+                location: "Assigned Bed (Pending)",
+                bloodGroup: realPatientData.bloodGroup || "TBD",
+            });
+        });
+
+        // Listen for hardware telemetry from backend
+        socket.on("hardware_status", (status) => {
+            setHardwareStatus(status);
+        });
+
+        return () => {
+            socket.off("patient_data");
+            socket.off("hardware_status");
+        };
+    }, [setPatient]);
 
     const onNFCTap = (data) => {
         if (data.action === "VIEW_PATIENT") {
@@ -16,28 +43,15 @@ export default function HospitalDashboard() {
         }
     };
 
-    // Mock function to simulate NFC tap for demo
+    // Leaving manual simulate buttons just in case physical hardware is disconnected,
+    // but the system is now real web-socket driven.
     const triggerSimulation = async (type) => {
         if (type === 'patient') {
             const mockNfcId = "PAT-8821";
             try {
-                // Fetch limited patient info for management dashboard
-                let patientData;
-                try {
-                    const res = await hospitalAPI.getPatientByNfc(mockNfcId);
-                    patientData = res.data;
-                } catch (e) {
-                    // Fallback for UI demo
-                    patientData = {
-                        id: "P-882129",
-                        name: "John Doe",
-                        role: "Patient",
-                        location: "Ward 4B, Room 12",
-                        bloodGroup: "O+",
-                        lastVisit: "2026-01-15"
-                    };
-                }
-                setPatient(patientData);
+                // Fetch limited patient info for management dashboard natively if available
+                const res = await hospitalAPI.getPatientByNfc(mockNfcId);
+                setPatient(res.data);
             } catch (err) {
                 console.error("NFC Load Failed:", err);
             }
@@ -148,7 +162,7 @@ export default function HospitalDashboard() {
                 <div className="lg:col-span-2">
                     <PatientFlowChart />
                 </div>
-                <SystemHealth />
+                <SystemHealth hardwareStatus={hardwareStatus} />
             </section>
 
         </div>
@@ -215,12 +229,12 @@ function PatientFlowChart() {
     );
 }
 
-function SystemHealth() {
+function SystemHealth({ hardwareStatus }) {
     const services = [
-        { name: "NFC Gateway", status: "Online", latency: "12ms" },
+        { name: "NFC Gateway", status: hardwareStatus?.nfc === "connected" ? "Online" : "Offline", latency: "12ms" },
         { name: "Database", status: "Online", latency: "45ms" },
-        { name: "Auth Service", status: "Online", latency: "22ms" },
-        { name: "Backup Node", status: "Syncing", latency: "---" }
+        { name: "GSM Module", status: hardwareStatus?.gsm === "online" ? "Online" : "Offline", latency: "22ms" },
+        { name: "Raspberry Pi", status: hardwareStatus?.raspberrypi === "online" ? "Active" : "Offline", latency: "---" }
     ];
 
     return (

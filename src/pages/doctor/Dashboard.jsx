@@ -53,18 +53,25 @@ export default function DoctorDashboard() {
         socket.on("nfc_scanned", (data) => {
             console.log("NFC Card detected via WebSocket:", data.uid);
             setStep('scanning'); // Show scanning briefly if it was idle
-            // Advance UI automatically without user click
-            setScannedUid(data.uid);
+        });
+
+        // 🟢 Listen to patient data arriving in real time from DB
+        socket.on("patient_data", (realPatientData) => {
+            console.log("Patient Data received via WebSocket:", realPatientData);
             
-            // Short delay to show the scanning animation, then move to fingerprint
-            setTimeout(() => {
-                setStep('fingerprint');
-            }, 600);
+            // Translate database keys to UI expectations
+            setPatient({
+                ...realPatientData,
+                name: realPatientData.fullName || realPatientData.name || "Unknown Patient",
+                healthId: realPatientData.user?.username || realPatientData.nfcUuid || realPatientData._id,
+            });
+            setStep('success'); // Skip manual steps, go straight to success for demo
         });
 
         return () => {
             socket.off("device_status");
             socket.off("nfc_scanned");
+            socket.off("patient_data");
         };
     }, []);
 

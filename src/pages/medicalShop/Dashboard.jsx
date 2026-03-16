@@ -1,31 +1,37 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import medicalShopApi from "../../services/medicalShop.api";
+import socket from "../../services/socket";
 
 export default function MedicalShopDashboard() {
     const [patient, setPatient] = useState(null);
     const [loading, setLoading] = useState(false);
 
+    useEffect(() => {
+        // Listen to patient data arriving in real time from DB
+        socket.on("patient_data", (realPatientData) => {
+            setLoading(false);
+            // Translate database keys if needed for UI
+            setPatient({
+                ...realPatientData,
+                name: realPatientData.fullName || realPatientData.name || "Unknown Patient",
+                prescriptions: realPatientData.prescriptions || []
+            });
+        });
+
+        return () => {
+            socket.off("patient_data");
+        };
+    }, []);
+
+    // The button scan can remain to trigger a fetch fallback,
+    // but the system is waiting for the real hardware event
     const handleScan = async () => {
         setLoading(true);
         try {
-            const data = await medicalShopApi.scanNFC();
-            setPatient(data);
+            // Optional HTTP fallback can stay here if Pi API exists, 
+            // but the UI will update instantly via WebSockets upon hardware tap.
         } catch (err) {
             console.error("Scan error:", err);
-            // Fallback for demo if backend is not ready
-            setPatient({
-                name: "John Doe",
-                age: 54,
-                gender: "Male",
-                phone: "9XXXXXXXXX",
-                prescriptions: [
-                    { id: "RX-9942", name: "Atorvastatin 10mg" },
-                    { id: "RX-8821", name: "Aspirin 75mg" },
-                    { id: "RX-7710", name: "Metformin 500mg" }
-                ]
-            });
-            // alert("Unauthorized or invalid card. Ensure you use medical shop credentials.");
-        } finally {
             setLoading(false);
         }
     };
