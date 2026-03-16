@@ -2,7 +2,7 @@ import axios from "axios"
 import tokenService from "./token.service";
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : "https://smart-id-backend-x3ug.onrender.com/api",
+    baseURL: import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : "https://smart-id-backend.onrender.com/api",
     timeout: 10000,
 })
 
