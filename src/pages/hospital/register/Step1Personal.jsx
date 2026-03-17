@@ -26,7 +26,7 @@ export default function Step1Personal() {
                         <input
                             name="fullName"
                             defaultValue={data.personal.fullName}
-                            placeholder="e.g. John Doe"
+                            placeholder="Enter full name"
                             className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
                             required
                         />

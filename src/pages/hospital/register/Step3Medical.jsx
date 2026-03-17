@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePatientRegistration } from "../../../context/PatientRegistrationContext";
 import hospitalAPI from "../../../services/management.api";
 import { useNavigate } from "react-router-dom";
-
+import socket from "../../../services/socket";
 import { useAuth } from "../../../auth/AuthProvider";
 
 export default function Step3Medical() {
@@ -11,6 +11,21 @@ export default function Step3Medical() {
     const navigate = useNavigate();
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [nfcStatus, setNfcStatus] = useState(data.nfcId ? "Linked" : "Waiting for Tap");
+
+    useEffect(() => {
+        // Listen for physical NFC card tap specifically for registration linking
+        const handleRegistrationScan = (scanData) => {
+            console.log("Registration NFC Scan detected:", scanData.uid);
+            update("nfcId", scanData.uid);
+            setNfcStatus("Linked: " + scanData.uid);
+        };
+
+        socket.on("nfc_scanned", handleRegistrationScan);
+
+        return () => {
+            socket.off("nfc_scanned", handleRegistrationScan);
+        };
+    }, [update]);
 
     const complete = async (e) => {
         e.preventDefault();
@@ -24,9 +39,15 @@ export default function Step3Medical() {
                 ...data.personal,
                 ...data.contact,
                 ...medicalData,
-                hospitalId: user?.id, // Injecting hospital ID from auth context
-                nfcId: data.nfcId || "SIM-NFC-" + Math.random().toString(36).substr(2, 9), // Simulated if not tapped
+                hospitalId: user?.id,
+                nfcId: data.nfcId || null,
             };
+
+            if (!payload.nfcId) {
+                alert("Please tap an NFC card to link before completing registration.");
+                setIsSubmitting(false);
+                return;
+            }
 
             console.log("FINAL REGISTRATION PAYLOAD:", payload);
 
@@ -60,11 +81,7 @@ export default function Step3Medical() {
         }
     };
 
-    const simulateNFCTap = () => {
-        const mockId = "NFC-" + Math.random().toString(36).substr(2, 9).toUpperCase();
-        update("nfcId", mockId);
-        setNfcStatus("Linked: " + mockId);
-    };
+    // Simulation removed to enforce real hardware workflow.
 
     const goBack = () => {
         navigate("/hospital/register/contact");
@@ -144,13 +161,10 @@ export default function Step3Medical() {
                         <p className="text-xs text-emerald-600/70 mt-1 uppercase font-bold tracking-wider">Tap Smart-ID card now to link profile</p>
                     </div>
                     {!data.nfcId && (
-                        <button
-                            type="button"
-                            onClick={simulateNFCTap}
-                            className="text-xs font-bold px-4 py-2 bg-emerald-100 text-emerald-700 dark:bg-emerald-800 dark:text-emerald-200 rounded-lg hover:bg-emerald-200"
-                        >
-                            Simulate NFC Tap
-                        </button>
+                        <div className="flex items-center gap-2 text-xs font-bold px-4 py-2 bg-emerald-100 text-emerald-700 dark:bg-emerald-800 dark:text-emerald-200 rounded-lg">
+                            <div className="size-2 bg-emerald-500 rounded-full animate-ping"></div>
+                            Hardware Reader Active
+                        </div>
                     )}
                 </div>
 

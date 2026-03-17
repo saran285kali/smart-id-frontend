@@ -22,9 +22,6 @@ export default function BiometricAuth() {
         setScanStatus("SCANNING");
 
         try {
-            // Simulate biometric delay
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
             const res = await hospitalAPI.verifyBiometric(patient.id, authMethod.toLowerCase());
 
             if (res.data.success) {

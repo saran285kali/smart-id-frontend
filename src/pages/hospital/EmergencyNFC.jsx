@@ -59,13 +59,15 @@ export default function EmergencyNFC() {
 
                 <div className="px-10 pb-10">
                     {isScanning ? (
-                        <button
-                            onClick={handleNFCTap}
-                            className="w-full py-5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-lg rounded-2xl transition-all shadow-xl flex items-center justify-center gap-3"
-                        >
-                            <span className="material-symbols-outlined">sensors</span>
-                            Simulate Card Detection
-                        </button>
+                        <div className="flex flex-col items-center gap-4">
+                            <div className="flex items-center gap-2 text-xs font-bold px-6 py-3 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-2xl">
+                                <div className="size-2 bg-red-500 rounded-full animate-ping"></div>
+                                Waiting for Hardware Tap
+                            </div>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                                Place the physical card against the Raspberry Pi reader
+                            </p>
+                        </div>
                     ) : (
                         <div className="py-5 bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-500 rounded-2xl flex items-center justify-center gap-3 text-emerald-700 dark:text-emerald-400 font-bold animate-in fade-in zoom-in-95">
                             <span className="material-symbols-outlined">check_circle</span>
