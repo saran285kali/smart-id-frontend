@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import doctorApi from "../../services/doctor.api";
 import { saveOfflineScan } from "../../services/db.service";
-import socket from "../../services/socket";
 
 export default function DoctorDashboard() {
     const [patient, setPatient] = useState(null);
@@ -44,43 +43,12 @@ export default function DoctorDashboard() {
             }
         };
         fetchStatus();
-
-        // 🟢 Real-time WebSocket Listeners 🟢
-        socket.on("device_status", (status) => {
-            setHardware(status);
-        });
-
-        socket.on("nfc_scanned", (data) => {
-            console.log("NFC Card detected via WebSocket:", data.uid);
-            setStep('scanning'); // Show scanning briefly if it was idle
-        });
-
-        // 🟢 Listen to patient data arriving in real time from DB
-        socket.on("patient_data", (realPatientData) => {
-            console.log("Patient Data received via WebSocket:", realPatientData);
-            
-            // Translate database keys to UI expectations
-            setPatient({
-                ...realPatientData,
-                name: realPatientData.fullName || realPatientData.name || "Unknown Patient",
-                healthId: realPatientData.user?.username || realPatientData.nfcUuid || realPatientData._id,
-            });
-            setStep('success'); // Skip manual steps, go straight to success for demo
-        });
-
-        return () => {
-            socket.off("device_status");
-            socket.off("nfc_scanned");
-            socket.off("patient_data");
-        };
     }, []);
 
     // Step 1: Trigger NFC Scan (Optional manual fallback)
     const handleStartScan = async () => {
         setStep('scanning');
         try {
-            // In a real-time setup this might just tell the Pi to wake up,
-            // but we can leave the original API call for fallback.
             const data = await doctorApi.scanNfc();
             if (data && data.uid) {
                 setScannedUid(data.uid);
@@ -88,9 +56,8 @@ export default function DoctorDashboard() {
             }
         } catch (err) {
             console.error("NFC Scan Failed", err);
-            // Don't reset to idle if WebSocket might still arrive
-            // setStep('idle');
-            // alert("NFC Scan Failed or Timeout. Please try again or tap card directly.");
+            alert("NFC Scan Failed. Please try again.");
+            setStep('idle');
         }
     };
 
@@ -100,12 +67,8 @@ export default function DoctorDashboard() {
             const data = await doctorApi.verifyFingerprint();
             if (data.verified) {
                 setStep('sending_otp');
-                
-                // Fetch patient phone based on UID to send OTP
                 const patientData = await doctorApi.getPatientByUid(scannedUid);
                 setPhone(patientData.phone);
-                
-                // Trigger backend to send OTP via SIM800L
                 await doctorApi.sendOtp(patientData.phone);
                 setStep('verify_otp');
             } else {
@@ -123,11 +86,14 @@ export default function DoctorDashboard() {
     const handleVerifyOtp = async () => {
         try {
             const result = await doctorApi.verifyOtp({ phone, otp });
-            if (result.success || result.token || result.verified) { // Depends on backend response
+            if (result.success || result.token || result.verified) { 
                 setStep('success');
-                // Fetch full real patient data from database
                 const finalPatientData = await doctorApi.getPatientByUid(scannedUid);
-                setPatient(finalPatientData);
+                setPatient({
+                    ...finalPatientData,
+                    name: finalPatientData.fullName || finalPatientData.name || "Unknown Patient",
+                    healthId: finalPatientData.user?.username || finalPatientData.nfcUuid || finalPatientData._id,
+                });
             } else {
                 alert("Invalid OTP");
             }

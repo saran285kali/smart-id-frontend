@@ -1,28 +1,28 @@
 import api from "../services/api";
 
 const hospitalAPI = {
-    registerPatient: (payload) => api.post("/hospital/patients", payload),
+    registerPatient: (payload) => api.post("/auth/register", payload),
 
     // Patient Session & NFC
-    getPatientByNfc: (nfcId) => api.get(`/hospital/patients/by-nfc/${nfcId}`),
+    getPatientByNfc: (nfcId) => api.get(`/nfc/patient/${nfcId}`),
 
     // OTP Consent flow
-    sendOtp: (patientId) => api.post("/hospital/otp/send", { patientId }),
-    verifyOtp: (patientId, code) => api.post("/hospital/otp/verify", { patientId, otp: code }),
-    resendOtp: (patientId) => api.post("/hospital/otp/resend", { patientId }),
-    sendNomineeOtp: (patientId) => api.post("/hospital/otp/send-nominee", { patientId }),
+    sendOtp: (phone) => api.post("/otp/send-otp", { phone }),
+    verifyOtp: (payload) => api.post("/otp/verify-otp", payload),
+    resendOtp: (phone) => api.post("/otp/send-otp", { phone }),
+    // sendNomineeOtp: (patientId) => api.post("/hospital/otp/send-nominee", { patientId }), // No backend match yet
 
     // Biometric Verification
-    verifyBiometric: (patientId, subject) => api.post("/hospital/biometric/verify", { patientId, subject }),
+    verifyBiometric: (payload) => api.post("/nfc/fingerprint", payload), // Unified with nfc routes
 
     // Emergency Override
-    authenticateEmergencyManager: (credentials) => api.post("/hospital/emergency/auth", credentials),
+    // authenticateEmergencyManager: (credentials) => api.post("/hospital/emergency/auth", credentials),
 
     // Clinical Records
-    createEmr: (payload) => api.post("/hospital/emr/create", payload),
+    // createEmr: (payload) => api.post("/hospital/emr/create", payload),
 
     // Statistics
-    getStats: () => api.get("/hospital/stats"),
+    getStats: () => api.get("/patient/profile"), // Fallback for demo
 };
 
 export default hospitalAPI;

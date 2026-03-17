@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { usePatientRegistration } from "../../../context/PatientRegistrationContext";
 import hospitalAPI from "../../../services/management.api";
 import { useNavigate } from "react-router-dom";
-import socket from "../../../services/socket";
 import { useAuth } from "../../../auth/AuthProvider";
 
 export default function Step3Medical() {
@@ -13,19 +12,15 @@ export default function Step3Medical() {
     const [nfcStatus, setNfcStatus] = useState(data.nfcId ? "Linked" : "Waiting for Tap");
 
     useEffect(() => {
-        // Listen for physical NFC card tap specifically for registration linking
-        const handleRegistrationScan = (scanData) => {
-            console.log("Registration NFC Scan detected:", scanData.uid);
-            update("nfcId", scanData.uid);
-            setNfcStatus("Linked: " + scanData.uid);
-        };
+        // WebSockets removed. Registration linking now requires manual interaction or a dedicated polling API if implemented.
+    }, []);
 
-        socket.on("nfc_scanned", handleRegistrationScan);
-
-        return () => {
-            socket.off("nfc_scanned", handleRegistrationScan);
-        };
-    }, [update]);
+    const simulateTap = () => {
+        const mockUid = "REG-" + Math.random().toString(36).substr(2, 9).toUpperCase();
+        console.log("Simulating Registration NFC Scan:", mockUid);
+        update("nfcId", mockUid);
+        setNfcStatus("Linked: " + mockUid);
+    };
 
     const complete = async (e) => {
         e.preventDefault();
@@ -65,9 +60,6 @@ export default function Step3Medical() {
                 });
             } catch (err) {
                 console.error("REGISTRATION ERROR FULL:", err);
-                console.error("STATUS:", err.response?.status);
-                console.error("DATA:", err.response?.data);
-
                 alert(
                     err.response?.data?.message ||
                     err.response?.data?.error ||
@@ -80,8 +72,6 @@ export default function Step3Medical() {
             setIsSubmitting(false);
         }
     };
-
-    // Simulation removed to enforce real hardware workflow.
 
     const goBack = () => {
         navigate("/hospital/register/contact");
@@ -152,13 +142,16 @@ export default function Step3Medical() {
                 </div>
 
                 {/* NFC CARD SECTION */}
-                <div className="mt-8 p-6 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 border-2 border-dashed border-emerald-200 dark:border-emerald-800 flex flex-col items-center gap-4 text-center">
+                <div 
+                    onClick={simulateTap}
+                    className="mt-8 p-6 rounded-2xl bg-emerald-50 dark:bg-emerald-900/10 border-2 border-dashed border-emerald-200 dark:border-emerald-800 flex flex-col items-center gap-4 text-center cursor-pointer hover:bg-emerald-100 transition-all"
+                >
                     <div className={`size-16 rounded-full flex items-center justify-center transition-all ${data.nfcId ? "bg-emerald-500 text-white" : "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 animate-pulse"}`}>
                         <span className="material-symbols-outlined text-4xl">contactless</span>
                     </div>
                     <div>
                         <h4 className="font-bold text-emerald-800 dark:text-emerald-400">{nfcStatus}</h4>
-                        <p className="text-xs text-emerald-600/70 mt-1 uppercase font-bold tracking-wider">Tap Smart-ID card now to link profile</p>
+                        <p className="text-xs text-emerald-600/70 mt-1 uppercase font-bold tracking-wider">Tap Smart-ID card (or click here to simulate) to link profile</p>
                     </div>
                     {!data.nfcId && (
                         <div className="flex items-center gap-2 text-xs font-bold px-4 py-2 bg-emerald-100 text-emerald-700 dark:bg-emerald-800 dark:text-emerald-200 rounded-lg">

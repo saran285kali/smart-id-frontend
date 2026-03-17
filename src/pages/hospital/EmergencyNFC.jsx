@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useSession } from "../../context/SessionContext";
 import { useEmergency } from "../../context/EmergencyContext";
-import socket from "../../services/socket";
 
 export default function EmergencyNFC() {
     const navigate = useNavigate();
@@ -15,19 +14,16 @@ export default function EmergencyNFC() {
             navigate("/hospital");
         }
         
-        // Listen for real-time NFC events
-        socket.on("nfc_scanned", (data) => {
-            console.log("Emergency NFC Card tap detected via WebSocket:", data.uid);
+        // Since WebSockets are removed, we use a manual tap simulation for the demo 
+        // to progress through the emergency flow.
+        const timer = setTimeout(() => {
             handleNFCTap();
-        });
+        }, 5000);
 
-        return () => {
-            socket.off("nfc_scanned");
-        };
+        return () => clearTimeout(timer);
     }, [emergency, navigate]);
 
     const handleNFCTap = () => {
-        // Simulate detecting the NFC card that was already tapped to start the session
         setIsScanning(false);
         setTimeout(() => {
             navigate("/hospital/clinical-note");
@@ -40,7 +36,10 @@ export default function EmergencyNFC() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-red-950/20 backdrop-blur-md p-4">
             <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-red-100 dark:border-red-900/30 overflow-hidden animate-in zoom-in-95 duration-300">
                 <div className="p-10 text-center">
-                    <div className={`mx-auto size-24 bg-red-50 dark:bg-red-950 rounded-3xl flex items-center justify-center mb-8 border border-red-100 dark:border-red-800 relative ${isScanning ? 'animate-pulse' : ''}`}>
+                    <div 
+                        onClick={handleNFCTap}
+                        className={`mx-auto size-24 bg-red-50 dark:bg-red-950 rounded-3xl flex items-center justify-center mb-8 border border-red-100 dark:border-red-800 relative cursor-pointer ${isScanning ? 'animate-pulse' : ''}`}
+                    >
                         <span className={`material-symbols-outlined text-6xl transition-all duration-500 ${isScanning ? 'text-red-500' : 'text-emerald-500'}`}>
                             contactless
                         </span>

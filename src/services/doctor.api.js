@@ -1,24 +1,24 @@
 import api from "../services/api"
 
 export default {
-    // NFC Scan
-    scanNfc: async () => {
-        const res = await api.get("/nfc/wait-scan")
+    // NFC Scan (Trigger or check last)
+    scanNfc: async (uid) => {
+        const res = await api.post("/nfc/scan", { uid })
         return res.data
     },
     // Fingerprint Verify
-    verifyFingerprint: async () => {
-        const res = await api.get("/fingerprint/verify")
+    verifyFingerprint: async (fingerId) => {
+        const res = await api.post("/nfc/fingerprint", { finger_id: fingerId })
         return res.data
     },
     // OTP Send
     sendOtp: async (phone) => {
-        const res = await api.post("/auth/send-otp", { phone })
+        const res = await api.post("/otp/send-otp", { phone })
         return res.data
     },
     // OTP Verify
     verifyOtp: async (payload) => {
-        const res = await api.post("/auth/verify-otp", payload)
+        const res = await api.post("/otp/verify-otp", payload)
         return res.data
     },
     // Fetch real patient data
@@ -27,11 +27,12 @@ export default {
         return res.data
     },
     getHistory: async () => {
-        const res = await api.get("/doctor/history")
+        // Fallback to my audit logs until a specific doctor history route is added
+        const res = await api.get("/audit/my")
         return res.data
     },
     getDeviceStatus: async () => {
-        const res = await api.get("/device-status")
-        return res.data
+        // Placeholder for device health
+        return { status: "Online", nfc: "connected", gsm: "online" };
     }
 }

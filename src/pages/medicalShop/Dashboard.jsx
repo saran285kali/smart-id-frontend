@@ -1,26 +1,12 @@
 import { useState, useEffect } from "react";
 import medicalShopApi from "../../services/medicalShop.api";
-import socket from "../../services/socket";
 
 export default function MedicalShopDashboard() {
     const [patient, setPatient] = useState(null);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        // Listen to patient data arriving in real time from DB
-        socket.on("patient_data", (realPatientData) => {
-            setLoading(false);
-            // Translate database keys if needed for UI
-            setPatient({
-                ...realPatientData,
-                name: realPatientData.fullName || realPatientData.name || "Unknown Patient",
-                prescriptions: realPatientData.prescriptions || []
-            });
-        });
-
-        return () => {
-            socket.off("patient_data");
-        };
+        // Since we removed WebSockets, we won't listen for pushed real-time data anymore.
     }, []);
 
     // The button scan can remain to trigger a fetch fallback,
@@ -29,9 +15,19 @@ export default function MedicalShopDashboard() {
         setLoading(true);
         try {
             // Optional HTTP fallback can stay here if Pi API exists, 
-            // but the UI will update instantly via WebSockets upon hardware tap.
+            // the UI will update upon successful API response.
+            const data = await medicalShopApi.scanNFC();
+            if (data && data.patient) {
+                setPatient({
+                    ...data.patient,
+                    name: data.patient.fullName || data.patient.name || "Unknown Patient",
+                    prescriptions: data.patient.prescriptions || []
+                });
+            }
         } catch (err) {
             console.error("Scan error:", err);
+            alert("NFC Scan Failed. Please try again.");
+        } finally {
             setLoading(false);
         }
     };
@@ -112,15 +108,15 @@ export default function MedicalShopDashboard() {
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 mb-10">
                                 <div className="space-y-1">
                                     <label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold block">Patient Age</label>
-                                    <p className="text-lg font-bold text-slate-900 dark:text-white">{patient.age} Years</p>
+                                    <p className="text-lg font-bold text-slate-900 dark:text-white">{patient.age || "N/A"} Years</p>
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold block">Gender</label>
-                                    <p className="text-lg font-bold text-slate-900 dark:text-white">{patient.gender}</p>
+                                    <p className="text-lg font-bold text-slate-900 dark:text-white">{patient.gender || "N/A"}</p>
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold block">Contact</label>
-                                    <p className="text-lg font-bold text-slate-900 dark:text-white">{patient.phone}</p>
+                                    <p className="text-lg font-bold text-slate-900 dark:text-white">{patient.phone || "N/A"}</p>
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[10px] uppercase tracking-widest text-slate-400 font-bold block">Status</label>
@@ -138,7 +134,7 @@ export default function MedicalShopDashboard() {
                                 </div>
 
                                 <div className="space-y-3">
-                                    {patient.prescriptions.map((p, i) => (
+                                    {patient.prescriptions && patient.prescriptions.map((p, i) => (
                                         <div key={i} className="flex items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm group hover:border-primary/30 transition-all">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-primary/10 group-hover:text-primary transition-all">
