@@ -8,15 +8,27 @@ export default function HospitalDashboard() {
     const { patient, setPatient, resetSession } = useSession();
     const [hardwareStatus, setHardwareStatus] = useState({});
 
+    const [stats, setStats] = useState(null);
+
     useEffect(() => {
-        // Since we removed WebSockets, we can initialize with a status check if an API exists
-        // For now, we'll just set a ready state to keep the UI functional
-        setHardwareStatus({
-            nfc: "connected",
-            gsm: "online",
-            raspberrypi: "online"
-        });
-    }, [setPatient]);
+        const fetchHardware = async () => {
+            try {
+                const res = await hospitalAPI.getStats(); // Currently mapped to /stats
+                setStats(res.data || res);
+                
+                // If there's a hardware status endpoint, we should call it here too
+                // For now, let's assume it's part of stats or a global status check
+                setHardwareStatus({
+                    nfc: res.hardware?.nfc || "offline",
+                    gsm: res.hardware?.gsm || "offline",
+                    raspberrypi: res.hardware?.pi || "offline"
+                });
+            } catch (err) {
+                console.error("Failed to fetch hospital telemetry:", err);
+            }
+        };
+        fetchHardware();
+    }, []);
 
     return (
         <div className="p-8 space-y-8 bg-slate-50 dark:bg-slate-950 min-h-full">
@@ -93,10 +105,10 @@ export default function HospitalDashboard() {
 
             {/* SUMMARY CARDS */}
             <section className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <Stat label="Daily Admissions" value="42" delta="+12%" icon="login" color="blue" />
-                <Stat label="ER Load" value="85%" status="Moderate" icon="emergency" color="red" />
-                <Stat label="Available Rooms" value="15" icon="bed" color="emerald" />
-                <Stat label="Staff on Duty" value="28" delta="-2" icon="medical_services" color="purple" />
+                <Stat label="Daily Admissions" value={stats?.dailyAdmissions || "0"} delta={stats?.admissionsDelta} icon="login" color="blue" />
+                <Stat label="ER Load" value={stats?.erLoad || "0%"} status={stats?.erStatus || "Standard"} icon="emergency" color="red" />
+                <Stat label="Available Rooms" value={stats?.availableRooms || "0"} icon="bed" color="emerald" />
+                <Stat label="Staff on Duty" value={stats?.staffCount || "0"} delta={stats?.staffDelta} icon="medical_services" color="purple" />
             </section>
 
             {/* CHART + SYSTEM HEALTH */}

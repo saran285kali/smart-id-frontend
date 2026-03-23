@@ -6,30 +6,37 @@ export default function AdminDashboard() {
     const { logout } = useAuth();
     const [view, setView] = useState("analytics");
     const [stats, setStats] = useState({
-        totalUsers: "1,280",
-        activeCards: "842",
-        dailyScans: "324",
-        emergencyAccess: "12"
+        totalUsers: "0",
+        activeCards: "0",
+        dailyScans: "0",
+        emergencyAccess: "0"
     });
 
     const [logs, setLogs] = useState([]);
     const [users, setUsers] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Mock Data initialization
-        setLogs([
-            { id: 1, action: "NFC_SCAN", user: "Dr. Khanna", target: "Patient SID-102", time: "2 mins ago" },
-            { id: 2, action: "DISPENSE", user: "Medical Hub XP", target: "RX-9942", time: "15 mins ago" },
-            { id: 3, action: "LOGIN", user: "Admin Root", target: "System", time: "1 hour ago" },
-            { id: 4, action: "NFC_SCAN", user: "Dr. Smith", target: "Patient SID-884", time: "2 hours ago" },
-        ]);
+        const fetchAdminData = async () => {
+            setLoading(true);
+            try {
+                const [statsRes, logsRes, usersRes] = await Promise.all([
+                    adminApi.getStatistics(),
+                    adminApi.getAuditLogs(),
+                    adminApi.getUsers()
+                ]);
+                
+                if (statsRes) setStats(statsRes);
+                if (logsRes) setLogs(Array.isArray(logsRes) ? logsRes : []);
+                if (usersRes) setUsers(Array.isArray(usersRes) ? usersRes : []);
+            } catch (err) {
+                console.error("Failed to load admin dashboard data:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-        setUsers([
-            { id: 1, name: "Dr. Rajesh Khanna", role: "doctor", status: "active", hospital: "Apollo Central" },
-            { id: 2, name: "Sarah Williams", role: "medical_shop", status: "active", hospital: "Pharmacy Plus" },
-            { id: 3, name: "David Miller", role: "admin", status: "active", hospital: "System Core" },
-            { id: 4, name: "Dr. Elena Gilbert", role: "doctor", status: "suspended", hospital: "City General" },
-        ]);
+        fetchAdminData();
     }, []);
 
     return (
@@ -146,72 +153,98 @@ export default function AdminDashboard() {
                                 </button>
                             </div>
 
-                            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
-                                <table className="w-full text-left">
-                                    <thead>
-                                        <tr className="bg-slate-50 dark:bg-slate-800/50">
-                                            <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Identify</th>
-                                            <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Authorized Role</th>
-                                            <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Affiliation</th>
-                                            <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Access Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y dark:divide-slate-800">
-                                        {users.map(u => (
-                                            <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-all group">
-                                                <td className="px-8 py-6">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500">
-                                                            {u.name[0]}
-                                                        </div>
-                                                        <span className="font-bold">{u.name}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-8 py-6">
-                                                    <span className="text-xs font-black uppercase py-1.5 px-3 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400">
-                                                        {u.role.replace('_', ' ')}
-                                                    </span>
-                                                </td>
-                                                <td className="px-8 py-6 text-sm text-slate-500 font-medium">{u.hospital}</td>
-                                                <td className="px-8 py-6 text-right">
-                                                    <button className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full transition-all border
-                                            ${u.status === 'active'
-                                                            ? "bg-green-50 text-green-600 border-green-100 dark:bg-green-900/10"
-                                                            : "bg-red-50 text-red-600 border-red-100 dark:bg-red-900/10"}
-                                        `}>
-                                                        {u.status}
-                                                    </button>
-                                                </td>
+                            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm min-h-[400px] flex flex-col justify-center">
+                                {loading ? (
+                                    <div className="flex flex-col items-center gap-4 py-20">
+                                        <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+                                        <p className="text-slate-500 font-bold">Synchronizing Staff Records...</p>
+                                    </div>
+                                ) : users.length === 0 ? (
+                                    <div className="text-center py-20 text-slate-500">
+                                        <span className="material-symbols-outlined text-4xl mb-2">person_off</span>
+                                        <p className="font-bold">No Staff Identities Found</p>
+                                        <p className="text-xs">Database returned empty user cluster.</p>
+                                    </div>
+                                ) : (
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="bg-slate-50 dark:bg-slate-800/50">
+                                                <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Identify</th>
+                                                <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Authorized Role</th>
+                                                <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest">Affiliation</th>
+                                                <th className="px-8 py-5 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Access Status</th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </thead>
+                                        <tbody className="divide-y dark:divide-slate-800">
+                                            {users.map(u => (
+                                                <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-all group">
+                                                    <td className="px-8 py-6">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-500">
+                                                                {u.name ? u.name[0] : '?'}
+                                                            </div>
+                                                            <span className="font-bold">{u.name || "Unnamed User"}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-8 py-6">
+                                                        <span className="text-xs font-black uppercase py-1.5 px-3 bg-slate-100 dark:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-400">
+                                                            {u.role ? u.role.replace('_', ' ') : 'N/A'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-8 py-6 text-sm text-slate-500 font-medium">{u.hospital || "Global"}</td>
+                                                    <td className="px-8 py-6 text-right">
+                                                        <button className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-full transition-all border
+                                                ${u.status === 'active'
+                                                                ? "bg-green-50 text-green-600 border-green-100 dark:bg-green-900/10"
+                                                                : "bg-red-50 text-red-600 border-red-100 dark:bg-red-900/10"}
+                                            `}>
+                                                            {u.status || "Unknown"}
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
                             </div>
                         </div>
                     )}
 
                     {view === "audit" && (
                         <div className="space-y-6 animate-in zoom-in-95 duration-500">
-                            <div className="flex flex-col gap-6">
-                                {logs.map(log => (
-                                    <div key={log.id} className="bg-slate-50 dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 flex items-center justify-between group hover:border-primary/50 transition-all">
-                                        <div className="flex items-center gap-6">
-                                            <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center text-primary shadow-sm group-hover:bg-primary group-hover:text-white transition-all">
-                                                <span className="material-symbols-outlined text-3xl">
-                                                    {log.action === "NFC_SCAN" ? "contactless" : log.action === "DISPENSE" ? "pill" : "login"}
-                                                </span>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <h4 className="font-black text-xl leading-none">{log.action} TRIGGERED</h4>
-                                                <p className="text-sm text-slate-500 font-medium">Initiated by <span className="text-slate-900 dark:text-white font-bold">{log.user}</span> • Target: {log.target}</p>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{log.time}</p>
-                                            <span className="text-[10px] font-bold text-green-500 bg-green-50 dark:bg-green-900/10 px-3 py-1 rounded-full uppercase">Verified Transaction</span>
-                                        </div>
+                        <div className="flex flex-col gap-6 min-h-[400px] justify-center">
+                                {loading ? (
+                                    <div className="flex flex-col items-center gap-4">
+                                        <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+                                        <p className="text-slate-500 font-bold">Accessing Audit Vault...</p>
                                     </div>
-                                ))}
+                                ) : logs.length === 0 ? (
+                                    <div className="bg-slate-50 dark:bg-slate-900 p-20 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 text-center text-slate-500">
+                                         <span className="material-symbols-outlined text-4xl mb-2">history_toggle_off</span>
+                                         <p className="font-bold">No Audit Records Available</p>
+                                         <p className="text-xs">All systems are quiet. No events captured in this cycle.</p>
+                                    </div>
+                                ) : (
+                                    logs.map(log => (
+                                        <div key={log.id} className="bg-slate-50 dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 flex items-center justify-between group hover:border-primary/50 transition-all">
+                                            <div className="flex items-center gap-6">
+                                                <div className="w-16 h-16 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center text-primary shadow-sm group-hover:bg-primary group-hover:text-white transition-all">
+                                                    <span className="material-symbols-outlined text-3xl">
+                                                        {log.action === "NFC_SCAN" ? "contactless" : log.action === "DISPENSE" ? "pill" : "login"}
+                                                    </span>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <h4 className="font-black text-xl leading-none">{log.action || "SYSTEM_EVENT"} TRIGGERED</h4>
+                                                    <p className="text-sm text-slate-500 font-medium">Initiated by <span className="text-slate-900 dark:text-white font-bold">{log.user || "System"}</span> • Target: {log.target || "Unknown"}</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">{log.time || "Just now"}</p>
+                                                <span className="text-[10px] font-bold text-green-500 bg-green-50 dark:bg-green-900/10 px-3 py-1 rounded-full uppercase">Verified Transaction</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
                             </div>
                         </div>
                     )}

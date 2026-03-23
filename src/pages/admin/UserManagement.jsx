@@ -8,18 +8,12 @@ export default function UserManagement() {
     useEffect(() => {
         adminApi.getUsers()
             .then(res => {
-                setUsers(res.data);
+                setUsers(Array.isArray(res.data) ? res.data : (Array.isArray(res) ? res : []));
                 setLoading(false);
             })
             .catch(err => {
                 console.error("Failed to load users:", err);
-                // Mock data for UI demo
-                setUsers([
-                    { name: "Dr. Alexander Pierce", role: "DOCTOR", lastLogin: "2026-02-08 18:30", status: "Active" },
-                    { name: "Principal Admin", role: "ADMIN", lastLogin: "2026-02-08 21:45", status: "Active" },
-                    { name: "Sarah Connor", role: "MANAGER", lastLogin: "2026-02-07 09:12", status: "Inactive" },
-                    { name: "City Pharma Staff", role: "MEDICAL_SHOP", lastLogin: "2026-02-08 14:22", status: "Active" }
-                ]);
+                setUsers([]);
                 setLoading(false);
             });
     }, []);
@@ -54,26 +48,36 @@ export default function UserManagement() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800">
-                        {users.map((u, i) => (
-                            <tr key={i} className="group hover:bg-slate-800/30 transition-colors">
-                                <td className="p-6 font-bold text-slate-200">{u.name}</td>
-                                <td className="p-6">
-                                    <span className={`px-3 py-1 rounded-lg text-[10px] font-black tracking-tight border ${u.role === 'ADMIN' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                                        }`}>
-                                        {u.role}
-                                    </span>
-                                </td>
-                                <td className="p-6 text-slate-400 font-mono text-xs">{u.lastLogin}</td>
-                                <td className="p-6 text-right">
-                                    <button className="text-emerald-500 font-black uppercase text-[10px] tracking-widest hover:text-emerald-400 p-2">
-                                        Edit Credentials
-                                    </button>
-                                    <button className="text-slate-500 font-black uppercase text-[10px] tracking-widest hover:text-red-500 p-2">
-                                        Revoke
-                                    </button>
+                        {users.length === 0 ? (
+                            <tr>
+                                <td colSpan="4" className="p-20 text-center text-slate-500">
+                                    <span className="material-symbols-outlined text-4xl mb-2">person_off</span>
+                                    <p className="font-bold">No registered accounts found.</p>
+                                    <p className="text-xs uppercase tracking-widest mt-1">Check backend connection or database state.</p>
                                 </td>
                             </tr>
-                        ))}
+                        ) : (
+                            users.map((u, i) => (
+                                <tr key={i} className="group hover:bg-slate-800/30 transition-colors">
+                                    <td className="p-6 font-bold text-slate-200">{u.name}</td>
+                                    <td className="p-6">
+                                        <span className={`px-3 py-1 rounded-lg text-[10px] font-black tracking-tight border ${u.role === 'ADMIN' ? 'bg-red-500/10 text-red-500 border-red-500/20' : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                            }`}>
+                                            {u.role}
+                                        </span>
+                                    </td>
+                                    <td className="p-6 text-slate-400 font-mono text-xs">{u.lastLogin}</td>
+                                    <td className="p-6 text-right">
+                                        <button className="text-emerald-500 font-black uppercase text-[10px] tracking-widest hover:text-emerald-400 p-2">
+                                            Edit Credentials
+                                        </button>
+                                        <button className="text-slate-500 font-black uppercase text-[10px] tracking-widest hover:text-red-500 p-2">
+                                            Revoke
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
                     </tbody>
                 </table>
             </div>

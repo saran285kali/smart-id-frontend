@@ -1,8 +1,32 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import adminApi from "../../services/admin.api";
 import PermissionConfirmModal from "../../components/admin/PermissionConfirmModal";
 
 export default function Permissions() {
     const [showConfirm, setShowConfirm] = useState(false);
+    const [permissions, setPermissions] = useState({});
+    const [pendingChanges, setPendingChanges] = useState(0);
+
+    useEffect(() => {
+        adminApi.getPermissions()
+            .then(data => {
+                if (data) setPermissions(data);
+            })
+            .catch(err => console.error("Could not fetch security matrix:", err));
+    }, []);
+
+    const togglePermission = (role, key) => {
+        setPermissions(prev => ({
+            ...prev,
+            [role]: {
+                ...prev[role],
+                [key]: !prev[role]?.[key]
+            }
+        }));
+        setPendingChanges(prev => prev + 1);
+    };
+
+    const roles = ['DOCTOR', 'HOSPITAL', 'PATIENT', 'MEDICAL_SHOP'];
 
     return (
         <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-24">
@@ -23,22 +47,24 @@ export default function Permissions() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {['DOCTOR', 'HOSPITAL', 'PATIENT', 'MEDICAL_SHOP'].map((role) => (
+                    {roles.map((role) => (
                         <div key={role} className="p-6 bg-slate-900 rounded-2xl border border-slate-800 hover:border-emerald-500/40 transition-all cursor-pointer group">
                             <p className="text-[10px] font-black tracking-[0.2em] text-slate-500 mb-4">{role}</p>
                             <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-slate-300">EMR Write</span>
-                                    <div className="w-8 h-4 bg-emerald-500 rounded-full"></div>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-slate-300">Identity View</span>
-                                    <div className="w-8 h-4 bg-emerald-500 rounded-full"></div>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-slate-300">Emergency Bypass</span>
-                                    <div className="w-8 h-4 bg-slate-700 rounded-full"></div>
-                                </div>
+                                {[
+                                    { key: 'emrWrite', label: 'EMR Write' },
+                                    { key: 'identityView', label: 'Identity View' },
+                                    { key: 'emergencyBypass', label: 'Emergency Bypass' }
+                                ].map((p) => (
+                                    <div 
+                                        key={p.key} 
+                                        className="flex items-center justify-between cursor-pointer"
+                                        onClick={() => togglePermission(role, p.key)}
+                                    >
+                                        <span className="text-xs font-bold text-slate-300">{p.label}</span>
+                                        <div className={`w-8 h-4 rounded-full transition-all ${permissions[role]?.[p.key] ? 'bg-emerald-500' : 'bg-slate-700'}`}></div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     ))}
@@ -57,12 +83,17 @@ export default function Permissions() {
                         <span className="material-symbols-outlined">pending_actions</span>
                     </div>
                     <div>
-                        <span className="text-slate-300 font-bold block">Policy Update Pending</span>
-                        <span className="text-xs text-slate-500 font-medium">3 modifications to role-based access tokens</span>
+                        <span className="text-slate-300 font-bold block">{pendingChanges > 0 ? "Policy Update Pending" : "Policy Synced"}</span>
+                        <span className="text-xs text-slate-500 font-medium">{pendingChanges} modifications to role-based access tokens</span>
                     </div>
                 </div>
                 <div className="flex items-center gap-4">
-                    <button className="px-6 py-3 text-slate-400 font-bold hover:text-white transition-colors">Discard</button>
+                    <button 
+                        onClick={() => { setPendingChanges(0); window.location.reload(); }}
+                        className="px-6 py-3 text-slate-400 font-bold hover:text-white transition-colors"
+                    >
+                        Discard
+                    </button>
                     <button
                         onClick={() => setShowConfirm(true)}
                         className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-8 py-3 rounded-2xl font-black tracking-tight shadow-xl shadow-emerald-500/20 transition-all active:scale-95"

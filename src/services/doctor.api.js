@@ -32,7 +32,7 @@ export default {
         return res.data
     },
     getDeviceStatus: async () => {
-        // Placeholder for device health
-        return { status: "Online", nfc: "connected", gsm: "online" };
+        const res = await api.get("/doctor/device-status");
+        return res.data;
     }
 }

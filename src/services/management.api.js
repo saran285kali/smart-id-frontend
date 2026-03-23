@@ -22,7 +22,7 @@ const hospitalAPI = {
     // createEmr: (payload) => api.post("/hospital/emr/create", payload),
 
     // Statistics
-    getStats: () => api.get("/patient/profile"), // Fallback for demo
+    getStats: () => api.get("/stats"),
 };
 
 export default hospitalAPI;

@@ -24,6 +24,10 @@ const adminApi = {
     savePermissions: async (payload) => {
         const res = await api.post("/admin/permissions", payload);
         return res.data;
+    },
+    getPermissions: async () => {
+        const res = await api.get("/admin/permissions");
+        return res.data;
     }
 };
 

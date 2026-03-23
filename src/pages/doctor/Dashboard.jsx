@@ -26,19 +26,19 @@ export default function DoctorDashboard() {
         const fetchStatus = async () => {
             try {
                 const status = await doctorApi.getDeviceStatus();
-                // Assuming status returns { nfc: "Connected", fingerprint: "Connected", gsm: "Connected", pi: "Online" }
-                setHardware(status || {
-                    nfc: "Connected",
-                    fingerprint: "Connected",
-                    gsm: "Connected",
-                    pi: "Online"
+                setHardware({
+                    nfc: status?.nfc || "Offline",
+                    fingerprint: status?.fingerprint || "Offline",
+                    gsm: status?.gsm || "Offline",
+                    pi: status?.status || "Offline"
                 });
             } catch (err) {
+                console.error("Hardware status check failed:", err);
                 setHardware({
-                    nfc: "Disconnected",
-                    fingerprint: "Disconnected",
-                    gsm: "Disconnected",
-                    pi: "Offline"
+                    nfc: "Error",
+                    fingerprint: "Error",
+                    gsm: "Error",
+                    pi: "Error"
                 });
             }
         };

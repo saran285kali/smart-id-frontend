@@ -10,12 +10,7 @@ export default function PatientHistory() {
             .then(setRecords)
             .catch(err => {
                 console.error("Failed to load history", err);
-                // Fallback for demo
-                setRecords([
-                    { id: 1, patientName: "Aarav Sharma", date: "2024-02-01", summary: "Routine Checkup" },
-                    { id: 2, patientName: "Priya Patel", date: "2024-01-28", summary: "Mild Fever treatment" },
-                    { id: 3, patientName: "Vikram Singh", date: "2024-01-15", summary: "NFC Verification Success" },
-                ]);
+                setRecords([]);
             })
             .finally(() => setLoading(false));
     }, []);
