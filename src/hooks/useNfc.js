@@ -62,14 +62,5 @@ export const useNfc = (onScanSuccess) => {
         }
     }, [onScanSuccess]);
 
-    // 3. MANUAL SIMULATION (Restored as primary method while WebSockets are disabled)
-    const simulateScan = (mockId = "NFC-SIM-9901") => {
-        setIsScanning(true);
-        setTimeout(() => {
-            onScanSuccess?.(mockId);
-            setIsScanning(false);
-        }, 1500);
-    };
-
-    return { isScanning, error, startWebNfc, simulateScan };
+    return { isScanning, error, startWebNfc };
 };

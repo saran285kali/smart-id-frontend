@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import doctorApi from "../../services/doctor.api";
+import adminApi from "../../services/admin.api";
 import { saveOfflineScan } from "../../services/db.service";
 
 export default function DoctorDashboard() {
@@ -22,7 +23,6 @@ export default function DoctorDashboard() {
     });
 
     useEffect(() => {
-        // Fetch hardware status
         const fetchStatus = async () => {
             try {
                 const status = await doctorApi.getDeviceStatus();
@@ -30,7 +30,7 @@ export default function DoctorDashboard() {
                     nfc: status?.nfc || "Offline",
                     fingerprint: status?.fingerprint || "Offline",
                     gsm: status?.gsm || "Offline",
-                    pi: status?.status || "Offline"
+                    pi: status?.status || "Online"
                 });
             } catch (err) {
                 console.error("Hardware status check failed:", err);
@@ -42,24 +42,29 @@ export default function DoctorDashboard() {
                 });
             }
         };
-        fetchStatus();
-    }, []);
 
-    // Step 1: Trigger NFC Scan (Optional manual fallback)
-    const handleStartScan = async () => {
-        setStep('scanning');
-        try {
-            const data = await doctorApi.scanNfc();
-            if (data && data.uid) {
-                setScannedUid(data.uid);
-                setStep('fingerprint');
+        const pollNfc = async () => {
+            if (patient || step !== 'idle' && step !== 'scanning') return;
+            try {
+                const data = await adminApi.getLatestNfc();
+                if (data && data.nfcId) {
+                    setScannedUid(data.nfcId);
+                    setStep('fingerprint');
+                }
+            } catch (err) {
+                console.error("NFC Auto-poll failed", err);
             }
-        } catch (err) {
-            console.error("NFC Scan Failed", err);
-            alert("NFC Scan Failed. Please try again.");
-            setStep('idle');
-        }
-    };
+        };
+
+        fetchStatus();
+        const statusInterval = setInterval(fetchStatus, 5000);
+        const nfcInterval = setInterval(pollNfc, 2000);
+        
+        return () => {
+            clearInterval(statusInterval);
+            clearInterval(nfcInterval);
+        };
+    }, [patient, step]);
 
     // Step 2: Trigger Fingerprint Verification
     const handleVerifyFingerprint = async () => {
@@ -179,20 +184,18 @@ export default function DoctorDashboard() {
                     {/* STEP 1: IDLE / SCANNING */}
                     {(step === 'idle' || step === 'scanning') && (
                         <div className="flex flex-col items-center animate-in fade-in duration-500">
-                            <button
-                                onClick={handleStartScan}
-                                disabled={step === 'scanning'}
-                                className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 transition-all hover:scale-105
-                                    ${step === 'scanning' ? "bg-primary text-white shadow-lg shadow-primary/40 animate-pulse" : "bg-primary/10 text-primary"}
+                            <div
+                                className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 transition-all 
+                                    ${step === 'scanning' ? "bg-primary text-white shadow-lg shadow-primary/40 animate-pulse" : "bg-emerald-500/10 text-emerald-500"}
                                 `}
                             >
-                                <span className="material-symbols-outlined text-5xl">contactless</span>
-                            </button>
-                            <h2 className="text-2xl font-bold mb-2">
-                                {step === 'scanning' ? "Scanning NFC..." : "Tap Patient Smart-ID"}
+                                <span className={`material-symbols-outlined text-5xl ${step === 'idle' ? 'animate-pulse' : ''}`}>contactless</span>
+                            </div>
+                            <h2 className="text-2xl font-black mb-2">
+                                {step === 'scanning' ? "Identity Linked" : "📡 Waiting for Tap..."}
                             </h2>
-                            <p className="text-slate-500 font-medium max-w-sm mb-6">
-                                {step === 'scanning' ? "Waiting for Raspberry Pi NFC reader response." : "Hold the NFC card near the reader to extract the patient UID."}
+                            <p className="text-slate-500 font-bold max-w-sm mb-6">
+                                {step === 'scanning' ? "Decrypting hardware token..." : "Hold the patient's Smart-ID card near the Raspberry Pi node."}
                             </p>
                             {step === 'scanning' && (
                                 <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>

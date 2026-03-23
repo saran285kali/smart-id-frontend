@@ -28,6 +28,10 @@ const adminApi = {
     getPermissions: async () => {
         const res = await api.get("/admin/permissions");
         return res.data;
+    },
+    getLatestNfc: async () => {
+        const res = await api.get("/nfc");
+        return res.data;
     }
 };
 

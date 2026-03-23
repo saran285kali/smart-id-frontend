@@ -1,22 +1,36 @@
 import { useState, useEffect } from "react";
 import medicalShopApi from "../../services/medicalShop.api";
+import adminApi from "../../services/admin.api";
+import doctorApi from "../../services/doctor.api";
 
 export default function MedicalShopDashboard() {
     const [patient, setPatient] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [nfcId, setNfcId] = useState(null);
 
+    // Continuous polling for NFC hardware taps
     useEffect(() => {
-        // Since we removed WebSockets, we won't listen for pushed real-time data anymore.
-    }, []);
+        const interval = setInterval(() => {
+            if (patient) return; // Stop polling if we already have a patient session
 
-    // The button scan can remain to trigger a fetch fallback,
-    // but the system is waiting for the real hardware event
-    const handleScan = async () => {
+            adminApi.getLatestNfc()
+                .then(data => {
+                    if (data && data.nfcId && data.nfcId !== nfcId) {
+                        setNfcId(data.nfcId);
+                        handleAutoFetch(data.nfcId);
+                    }
+                })
+                .catch(err => console.error("NFC Hardware Poll Failed:", err));
+        }, 2000);
+
+        return () => clearInterval(interval);
+    }, [patient, nfcId]);
+
+    const handleAutoFetch = async (id) => {
         setLoading(true);
         try {
-            // Optional HTTP fallback can stay here if Pi API exists, 
-            // the UI will update upon successful API response.
-            const data = await medicalShopApi.scanNFC();
+            // First fetch patient by the hardware ID
+            const data = await doctorApi.getPatientByUid(id);
             if (data && data.patient) {
                 setPatient({
                     ...data.patient,
@@ -25,8 +39,9 @@ export default function MedicalShopDashboard() {
                 });
             }
         } catch (err) {
-            console.error("Scan error:", err);
-            alert("NFC Scan Failed. Please try again.");
+            console.error("Auto-fetch error:", err);
+            // Optionally reset nfcId to allow re-tap if it fails
+            setNfcId(null);
         } finally {
             setLoading(false);
         }
@@ -40,6 +55,11 @@ export default function MedicalShopDashboard() {
         );
     };
 
+    const resetSession = () => {
+        setPatient(null);
+        setNfcId(null);
+    };
+
     return (
         <div className="max-w-4xl mx-auto px-6">
             <div className="text-center mb-12">
@@ -51,31 +71,32 @@ export default function MedicalShopDashboard() {
                 </p>
             </div>
 
-            {/* NFC SCAN SURFACE */}
+            {/* REAL NFC MONITORING SURFACE */}
             {!patient && (
                 <div
-                    onClick={handleScan}
-                    className="group relative mx-auto max-w-sm aspect-square bg-white dark:bg-slate-900 rounded-[3rem] p-12 shadow-2xl shadow-primary/5 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all border border-slate-100 dark:border-slate-800 flex flex-col items-center justify-center text-center overflow-hidden"
+                    className="group relative mx-auto max-w-sm aspect-square bg-white dark:bg-slate-900 rounded-[3rem] p-12 shadow-2xl shadow-primary/5 border border-slate-100 dark:border-slate-800 flex flex-col items-center justify-center text-center overflow-hidden"
                 >
                     {/* Decorative background pulse */}
                     <div className="absolute inset-0 bg-primary/5 scale-0 group-hover:scale-100 transition-transform duration-700 rounded-full"></div>
 
                     <div className="relative w-28 h-28 rounded-full bg-primary/10 flex items-center justify-center mb-8">
-                        <span className="material-symbols-outlined text-primary text-6xl animate-pulse">
+                        <span className={`material-symbols-outlined text-primary text-6xl ${!loading ? 'animate-pulse' : ''}`}>
                             contactless
                         </span>
                     </div>
 
-                    <h2 className="relative text-2xl font-bold text-slate-900 dark:text-white">Tap to Scan</h2>
+                    <h2 className="relative text-2xl font-bold text-slate-900 dark:text-white">
+                        {nfcId ? "✅ Card Linked" : "📡 Waiting for Tap..."}
+                    </h2>
                     <p className="relative text-slate-500 mt-2 font-medium">
-                        Place patient card on the NFC reader
+                        {nfcId ? `ID: ${nfcId}` : "Place patient card on the NFC reader"}
                     </p>
 
                     {loading && (
                         <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm flex items-center justify-center">
                             <div className="flex flex-col items-center gap-4">
                                 <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-                                <span className="font-bold text-primary animate-pulse">Scanning Securely...</span>
+                                <span className="font-bold text-primary animate-pulse">Fetching Patient EMR...</span>
                             </div>
                         </div>
                     )}
@@ -97,7 +118,7 @@ export default function MedicalShopDashboard() {
                                 </div>
                             </div>
                             <button
-                                onClick={() => setPatient(null)}
+                                onClick={resetSession}
                                 className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-all"
                             >
                                 <span className="material-symbols-outlined">close</span>
@@ -134,7 +155,7 @@ export default function MedicalShopDashboard() {
                                 </div>
 
                                 <div className="space-y-3">
-                                    {patient.prescriptions && patient.prescriptions.map((p, i) => (
+                                    {(patient.prescriptions && patient.prescriptions.length > 0) ? patient.prescriptions.map((p, i) => (
                                         <div key={i} className="flex items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm group hover:border-primary/30 transition-all">
                                             <div className="flex items-center gap-4">
                                                 <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:bg-primary/10 group-hover:text-primary transition-all">
@@ -151,7 +172,12 @@ export default function MedicalShopDashboard() {
                                                 VIEW PDF
                                             </button>
                                         </div>
-                                    ))}
+                                    )) : (
+                                        <div className="text-center py-10 text-slate-400">
+                                            <span className="material-symbols-outlined text-4xl mb-2 opacity-20">block</span>
+                                            <p className="text-xs font-bold uppercase tracking-widest">No Active Prescriptions Found</p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="mt-8 flex gap-4">

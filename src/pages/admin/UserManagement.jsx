@@ -6,7 +6,7 @@ export default function UserManagement() {
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [formData, setFormData] = useState({ name: "", phone: "" });
-    const [isHardwareMode, setIsHardwareMode] = useState(false);
+    const [nfcId, setNfcId] = useState(null);
 
     const fetchUsers = () => {
         adminApi.getUsers()
@@ -21,18 +21,42 @@ export default function UserManagement() {
             });
     };
 
+    const fetchLatestNfc = () => {
+        adminApi.getLatestNfc()
+            .then(data => {
+                if (data && data.nfcId) {
+                    setNfcId(data.nfcId);
+                }
+            })
+            .catch(err => console.error("NFC Poll Error:", err));
+    };
+
     useEffect(() => {
         fetchUsers();
-        // Polling for real-time updates / Hardware Mode
-        const interval = setInterval(fetchUsers, 5000);
-        return () => clearInterval(interval);
+        // Polling loop for users and NFC data
+        const usersInterval = setInterval(fetchUsers, 5000);
+        const nfcInterval = setInterval(fetchLatestNfc, 2000);
+        
+        return () => {
+            clearInterval(usersInterval);
+            clearInterval(nfcInterval);
+        };
     }, []);
 
     const handleRegister = async (e) => {
         e.preventDefault();
+        if(!nfcId) {
+            alert("Please tap a physical NFC card first to link the identity.");
+            return;
+        }
         try {
-            await adminApi.createUser({ ...formData, role: 'PATIENT' });
+            await adminApi.createUser({ 
+                ...formData, 
+                role: 'PATIENT',
+                nfcUuid: nfcId 
+            });
             setFormData({ name: "", phone: "" });
+            setNfcId(null);
             setShowForm(false);
             fetchUsers();
         } catch (err) {
@@ -50,48 +74,57 @@ export default function UserManagement() {
         <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className="flex justify-between items-end">
                 <div>
-                    <h2 className="text-4xl font-black tracking-tight text-white">Smart-ID Infrastructure</h2>
+                    <h2 className="text-4xl font-black tracking-tight text-white">Smart-ID Network</h2>
                     <p className="text-slate-500 mt-2 font-medium">Monitoring {users.length} active system identities</p>
                 </div>
                 <div className="flex gap-4">
-                    <button 
-                        onClick={() => setIsHardwareMode(!isHardwareMode)}
-                        className={`px-6 py-3 font-bold rounded-xl transition-all flex items-center gap-2 ${isHardwareMode ? 'bg-amber-600 text-white shadow-amber-600/20' : 'bg-slate-800 text-slate-400'}`}
-                    >
-                        <span className="material-symbols-outlined">{isHardwareMode ? 'contactless' : 'sensors_off'}</span>
-                        {isHardwareMode ? 'Hardware Mode: Waiting' : 'Manual Mode'}
-                    </button>
+                    <div className={`px-6 py-3 font-bold rounded-xl transition-all border flex items-center gap-2 ${nfcId ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-500' : 'bg-amber-500/10 border-amber-500/50 text-amber-500'}`}>
+                        <span className="material-symbols-outlined">{nfcId ? 'verified' : 'contactless'}</span>
+                        {nfcId ? `✅ Linked: ${nfcId}` : '📡 Waiting for NFC tap...'}
+                    </div>
                     <button 
                         onClick={() => setShowForm(!showForm)}
                         className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20 transition-all flex items-center gap-2"
                     >
                         <span className="material-symbols-outlined">person_add</span>
-                        Provision New User
+                        Provision Patient
                     </button>
                 </div>
             </div>
 
             {showForm && (
-                <form onSubmit={handleRegister} className="bg-[#0f172a] p-8 rounded-3xl border border-slate-800 space-y-4 animate-in slide-in-from-top-4 duration-500">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input 
-                            className="bg-slate-900/50 border border-slate-800 p-4 rounded-xl text-white outline-none focus:border-emerald-500 transition-all"
-                            placeholder="Full Name"
-                            value={formData.name}
-                            onChange={(e) => setFormData({...formData, name: e.target.value})}
-                            required
-                        />
-                        <input 
-                            className="bg-slate-900/50 border border-slate-800 p-4 rounded-xl text-white outline-none focus:border-emerald-500 transition-all"
-                            placeholder="Phone Number"
-                            value={formData.phone}
-                            onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                            required
-                        />
+                <form onSubmit={handleRegister} className="bg-[#0f172a] p-8 rounded-3xl border border-slate-800 space-y-6 animate-in slide-in-from-top-4 duration-500">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Full Legal Name</label>
+                             <input 
+                                className="w-full bg-slate-900/50 border border-slate-800 p-4 rounded-xl text-white outline-none focus:border-emerald-500 transition-all"
+                                placeholder="e.g. John Doe"
+                                value={formData.name}
+                                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2">
+                             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Registered Phone</label>
+                             <input 
+                                className="w-full bg-slate-900/50 border border-slate-800 p-4 rounded-xl text-white outline-none focus:border-emerald-500 transition-all"
+                                placeholder="+91 00000 00000"
+                                value={formData.phone}
+                                onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                                required
+                            />
+                        </div>
+                    </div>
+                    <div className="p-4 bg-slate-900/50 border border-dashed border-slate-700 rounded-2xl flex items-center justify-between">
+                         <span className="text-sm font-bold text-slate-400">Target NFC Identity:</span>
+                         <span className={`text-sm font-black ${nfcId ? 'text-emerald-500' : 'text-amber-500'}`}>
+                            {nfcId || "Awaiting Physical Tap..."}
+                         </span>
                     </div>
                     <div className="flex justify-end gap-3">
-                        <button type="button" onClick={() => setShowForm(false)} className="px-6 py-2 text-slate-400 font-bold">Cancel</button>
-                        <button type="submit" className="px-8 py-2 bg-emerald-600 text-white font-black rounded-xl">Register Patient</button>
+                        <button type="button" onClick={() => setShowForm(false)} className="px-6 py-2 text-slate-400 font-bold hover:text-white transition-colors">Discard</button>
+                        <button type="submit" disabled={!nfcId} className="px-8 py-2 bg-emerald-600 text-white font-black rounded-xl disabled:opacity-50 disabled:grayscale">Link & Register</button>
                     </div>
                 </form>
             )}
@@ -123,7 +156,10 @@ export default function UserManagement() {
                                             <div className="size-8 rounded-lg bg-slate-800 flex items-center justify-center text-[10px]">
                                                 {u.name?.[0] || "?"}
                                             </div>
-                                            {u.name}
+                                            <div>
+                                                <p>{u.name}</p>
+                                                <p className="text-[10px] text-slate-500 font-mono tracking-tighter">{u.nfcUuid || "No Card Linked"}</p>
+                                            </div>
                                         </div>
                                     </td>
                                     <td className="p-6">

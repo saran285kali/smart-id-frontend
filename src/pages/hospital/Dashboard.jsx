@@ -2,18 +2,20 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../../context/SessionContext';
 import hospitalAPI from '../../services/management.api';
+import adminApi from "../../services/admin.api";
+import doctorApi from "../../services/doctor.api";
 
 export default function HospitalDashboard() {
     const navigate = useNavigate();
     const { patient, setPatient, resetSession } = useSession();
     const [hardwareStatus, setHardwareStatus] = useState({});
-
     const [stats, setStats] = useState(null);
+    const [isAutoFetching, setIsAutoFetching] = useState(false);
 
     useEffect(() => {
         const fetchHardware = async () => {
             try {
-                const res = await hospitalAPI.getStats(); // Currently mapped to /stats
+                const res = await hospitalAPI.getStats();
                 const data = res.data || res;
                 setStats(data);
                 
@@ -23,55 +25,79 @@ export default function HospitalDashboard() {
                     raspberrypi: data.hardware?.pi || "online"
                 });
             } catch (err) {
-                console.error("Failed to fetch hospital telemetry:", err);
+                console.error("Health poll failed", err);
             }
         };
+
+        const checkNfcTap = async () => {
+            if (patient || isAutoFetching) return;
+            try {
+                const data = await adminApi.getLatestNfc();
+                if (data && data.nfcId) {
+                    setIsAutoFetching(true);
+                    const patientData = await doctorApi.getPatientByUid(data.nfcId);
+                    if (patientData && patientData.patient) {
+                        setPatient(patientData.patient);
+                    }
+                    setIsAutoFetching(false);
+                }
+            } catch (err) {
+                console.error("NFC Detection error", err);
+                setIsAutoFetching(false);
+            }
+        };
+
         fetchHardware();
-        const interval = setInterval(fetchHardware, 5000);
-        return () => clearInterval(interval);
-    }, []);
+        const statInterval = setInterval(fetchHardware, 5000);
+        const nfcInterval = setInterval(checkNfcTap, 2000);
+        
+        return () => {
+            clearInterval(statInterval);
+            clearInterval(nfcInterval);
+        };
+    }, [patient, isAutoFetching, setPatient]);
 
     return (
         <div className="p-8 space-y-8 bg-slate-50 dark:bg-slate-950 min-h-full">
 
             {/* HEADER SECTION */}
             <div>
-                <h1 className="text-3xl font-bold text-slate-800 dark:text-white">Hospital Overview</h1>
-                <p className="text-slate-500 mt-2">Operational dashboard and NFC access control.</p>
+                <h1 className="text-3xl font-bold text-slate-800 dark:text-white">Clinical Control</h1>
+                <p className="text-slate-500 mt-2">Real-time system telemetry and NFC identity bridge.</p>
             </div>
 
             {/* NFC STATUS & ACTIVE SESSION */}
             <section className="bg-white dark:bg-[#1a2e2a] rounded-2xl p-8 border border-slate-200 dark:border-emerald-900/30 shadow-sm transition-all">
                 {!patient ? (
-                    <div className="text-center">
-                        <div className="mx-auto size-16 bg-emerald-100 dark:bg-emerald-900/40 rounded-full flex items-center justify-center mb-6">
-                            <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-4xl animate-pulse">
+                    <div className="text-center py-6">
+                        <div className="mx-auto size-24 bg-emerald-100 dark:bg-emerald-900/40 rounded-full flex items-center justify-center mb-6">
+                            <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-5xl animate-pulse">
                                 contactless
                             </span>
                         </div>
-                        <h3 className="text-2xl font-bold mb-2 text-slate-800 dark:text-emerald-50">
-                            NFC Status: Active / Waiting
+                        <h3 className="text-2xl font-black mb-2 text-slate-800 dark:text-emerald-50">
+                            {isAutoFetching ? "Linking Identity..." : "📡 Waiting for NFC tap..."}
                         </h3>
-                        <p className="text-sm text-slate-500 dark:text-emerald-200/60 max-w-md mx-auto">
-                            System is ready to receive hardware-registered patients. Polling active.
+                        <p className="text-sm text-slate-500 dark:text-emerald-200/60 max-w-sm mx-auto font-medium">
+                            Place the Smart-ID card on the Raspberry Pi reader. The EMR dashboard will activate automatically upon detection.
                         </p>
                     </div>
                 ) : (
                     <div className="flex flex-col md:flex-row items-center justify-between gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <div className="flex items-center gap-6">
                             <div className="size-20 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-emerald-600/20">
-                                <span className="material-symbols-outlined text-4xl">person</span>
+                                <span className="material-symbols-outlined text-4xl">verified_user</span>
                             </div>
                             <div>
-                                <h3 className="text-2xl font-bold text-slate-800 dark:text-white">{patient.name}</h3>
-                                <div className="flex gap-4 mt-1">
+                                <h3 className="text-2xl font-black text-slate-800 dark:text-white">{patient.name || patient.fullName}</h3>
+                                <div className="flex gap-4 mt-1 font-bold">
                                     <span className="text-sm text-slate-500 flex items-center gap-1">
-                                        <span className="material-symbols-outlined text-sm">fingerprint</span>
-                                        {patient.id}
+                                        <span className="material-symbols-outlined text-sm">id_card</span>
+                                        {patient.id || patient.uid}
                                     </span>
                                     <span className="text-sm text-slate-500 flex items-center gap-1">
                                         <span className="material-symbols-outlined text-sm">location_on</span>
-                                        {patient.location || "General Ward"}
+                                        {patient.location || "OPD Ward"}
                                     </span>
                                 </div>
                             </div>
@@ -83,21 +109,20 @@ export default function HospitalDashboard() {
                                 className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-2"
                             >
                                 <span className="material-symbols-outlined">edit_note</span>
-                                Add Clinical Note
+                                Open Ledger
                             </button>
                             <button
                                 onClick={() => navigate("/hospital/emergency/confirm")}
-                                disabled={!patient}
-                                className="px-6 py-3 bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 font-bold rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 transition-all flex items-center gap-2 disabled:opacity-50 disabled:grayscale"
+                                className="px-6 py-3 bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 font-bold rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 transition-all flex items-center gap-2"
                             >
                                 <span className="material-symbols-outlined">emergency</span>
-                                Emergency Override
+                                Emergency
                             </button>
                             <button
                                 onClick={resetSession}
                                 className="px-6 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
                             >
-                                End Session
+                                Disconnect
                             </button>
                         </div>
                     </div>
