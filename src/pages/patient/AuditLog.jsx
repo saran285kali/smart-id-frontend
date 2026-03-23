@@ -8,24 +8,19 @@ export default function AuditLog() {
     useEffect(() => {
         patientApi.getPatientAuditLog()
             .then(res => {
-                setLogs(res.data);
+                setLogs(Array.isArray(res) ? res : (Array.isArray(res.data) ? res.data : []));
                 setLoading(false);
             })
             .catch(err => {
                 console.error("Failed to load audit log:", err);
-                // Mock data for UI demo
-                setLogs([
-                    { timestamp: "2026-02-06 11:20:04", actorName: "Dr. Smith", action: "Record View", method: "NFC_VERIFIED", emergency: false },
-                    { timestamp: "2026-02-06 10:45:12", actorName: "Admin (Emergency)", action: "Clinical Write", method: "EMERGENCY_OVERRIDE", emergency: true },
-                    { timestamp: "2026-01-20 14:10:55", actorName: "Dr. Wilson", action: "Clinical Write", method: "OTP_VERIFIED", emergency: false }
-                ]);
+                setLogs([]);
                 setLoading(false);
             });
     }, []);
 
-    if (loading) return (
-        <div className="flex items-center justify-center p-20">
-            <div className="animate-spin size-8 border-4 border-emerald-600 border-t-transparent rounded-full"></div>
+    if (loading && logs.length === 0) return (
+        <div className="flex items-center justify-center p-20 text-emerald-500">
+            <div className="animate-spin size-8 border-4 border-emerald-500 border-t-transparent rounded-full"></div>
         </div>
     );
 
@@ -41,7 +36,7 @@ export default function AuditLog() {
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-[#11221f] rounded-[2rem] border border-slate-200 dark:border-emerald-900/40 overflow-hidden shadow-xl shadow-slate-200/50 dark:shadow-none">
+            <div className="bg-white dark:bg-[#11221f] rounded-[2rem] border border-slate-200 dark:border-emerald-900/40 overflow-hidden shadow-xl shadow-slate-200/50 dark:shadow-none min-h-[300px] flex flex-col justify-center">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead>
@@ -53,7 +48,15 @@ export default function AuditLog() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-emerald-900/10">
-                            {logs.map((log, i) => (
+                            {logs.length === 0 ? (
+                                <tr>
+                                    <td colSpan="4" className="p-20 text-center text-slate-500">
+                                        <span className="material-symbols-outlined text-4xl mb-2 opacity-20">history_toggle_off</span>
+                                        <p className="font-bold">No access records found in vault.</p>
+                                    </td>
+                                </tr>
+                            ) : (
+                                logs.map((log, i) => (
                                 <tr
                                     key={i}
                                     className={`transition-colors hover:bg-slate-50 dark:hover:bg-emerald-900/5 ${log.emergency ? "bg-red-50/50 dark:bg-red-900/10" : ""}`}
@@ -84,11 +87,12 @@ export default function AuditLog() {
                                         </div>
                                     </td>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            ))
+                        )}
+                    </tbody>
+                </table>
             </div>
+        </div>
 
             <div className="p-6 bg-emerald-50 content-[''] dark:bg-emerald-900/10 rounded-2xl border border-emerald-100 dark:border-emerald-800 flex items-start gap-4">
                 <span className="material-symbols-outlined text-emerald-600">info</span>

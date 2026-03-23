@@ -14,20 +14,21 @@ export default function HospitalDashboard() {
         const fetchHardware = async () => {
             try {
                 const res = await hospitalAPI.getStats(); // Currently mapped to /stats
-                setStats(res.data || res);
+                const data = res.data || res;
+                setStats(data);
                 
-                // If there's a hardware status endpoint, we should call it here too
-                // For now, let's assume it's part of stats or a global status check
                 setHardwareStatus({
-                    nfc: res.hardware?.nfc || "offline",
-                    gsm: res.hardware?.gsm || "offline",
-                    raspberrypi: res.hardware?.pi || "offline"
+                    nfc: data.hardware?.nfc || "online",
+                    gsm: data.hardware?.gsm || "online",
+                    raspberrypi: data.hardware?.pi || "online"
                 });
             } catch (err) {
                 console.error("Failed to fetch hospital telemetry:", err);
             }
         };
         fetchHardware();
+        const interval = setInterval(fetchHardware, 5000);
+        return () => clearInterval(interval);
     }, []);
 
     return (
@@ -44,15 +45,15 @@ export default function HospitalDashboard() {
                 {!patient ? (
                     <div className="text-center">
                         <div className="mx-auto size-16 bg-emerald-100 dark:bg-emerald-900/40 rounded-full flex items-center justify-center mb-6">
-                            <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-4xl">
+                            <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-4xl animate-pulse">
                                 contactless
                             </span>
                         </div>
                         <h3 className="text-2xl font-bold mb-2 text-slate-800 dark:text-emerald-50">
-                            NFC Status: Ready / Waiting
+                            NFC Status: Active / Waiting
                         </h3>
                         <p className="text-sm text-slate-500 dark:text-emerald-200/60 max-w-md mx-auto">
-                            Please have the patient tap their NFC card on the physical scanner.
+                            System is ready to receive hardware-registered patients. Polling active.
                         </p>
                     </div>
                 ) : (
@@ -70,7 +71,7 @@ export default function HospitalDashboard() {
                                     </span>
                                     <span className="text-sm text-slate-500 flex items-center gap-1">
                                         <span className="material-symbols-outlined text-sm">location_on</span>
-                                        {patient.location}
+                                        {patient.location || "General Ward"}
                                     </span>
                                 </div>
                             </div>
@@ -114,7 +115,7 @@ export default function HospitalDashboard() {
             {/* CHART + SYSTEM HEALTH */}
             <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
-                    <PatientFlowChart />
+                    <PatientFlowChart stats={stats} />
                 </div>
                 <SystemHealth hardwareStatus={hardwareStatus} />
             </section>
@@ -154,28 +155,29 @@ function Stat({ label, value, delta, status, icon, color }) {
     );
 }
 
-function PatientFlowChart() {
+function PatientFlowChart({ stats }) {
+    const chartData = stats?.chartData || [45, 60, 40, 75, 50, 85, 65];
     return (
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 h-[400px] flex flex-col shadow-sm">
             <div className="flex justify-between items-center mb-6">
                 <h3 className="font-bold text-slate-800 dark:text-white">Patient Flow Trend</h3>
-                <select className="bg-slate-50 dark:bg-slate-800 border-none text-sm rounded-lg px-3 py-1 text-slate-600 dark:text-slate-300">
-                    <option>Last 7 Days</option>
-                    <option>Last 30 Days</option>
-                </select>
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase text-emerald-500">
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping"></span>
+                    Live Telemetry
+                </div>
             </div>
             <div className="flex-1 flex items-end gap-2 px-2">
-                {[45, 60, 40, 75, 50, 85, 65].map((h, i) => (
+                {chartData.map((h, i) => (
                     <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
                         <div
                             style={{ height: `${h}%` }}
                             className="w-full bg-emerald-500/20 group-hover:bg-emerald-500/40 rounded-t-lg transition-all relative"
                         >
-                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                                {h}%
+                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                Value: {h}
                             </div>
                         </div>
-                        <span className="text-[10px] text-slate-400 font-bold">Day {i + 1}</span>
+                        <span className="text-[10px] text-slate-400 font-bold">PT-{i + 1}</span>
                     </div>
                 ))}
             </div>

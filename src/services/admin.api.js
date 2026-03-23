@@ -2,19 +2,19 @@ import api from "./api";
 
 const adminApi = {
     getStatistics: async () => {
-        const res = await api.get("/admin/statistics");
+        const res = await api.get("/stats");
         return res.data;
     },
     getAuditLogs: async () => {
-        const res = await api.get("/admin/audit-logs");
+        const res = await api.get("/logs");
         return res.data;
     },
     getUsers: async () => {
-        const res = await api.get("/admin/users");
+        const res = await api.get("/users");
         return res.data;
     },
     createUser: async (userData) => {
-        const res = await api.post("/admin/users", userData);
+        const res = await api.post("/users", userData);
         return res.data;
     },
     toggleUserStatus: async (userId) => {
