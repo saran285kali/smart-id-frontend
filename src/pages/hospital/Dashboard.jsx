@@ -15,15 +15,17 @@ export default function HospitalDashboard() {
     useEffect(() => {
         const fetchHardware = async () => {
             try {
-                const res = await hospitalAPI.getStats();
-                const data = res.data || res;
+                const res = await fetch(`${import.meta.env.VITE_API_URL}/api/status/stats`);
+                const data = await res.json();
+
                 setStats(data);
-                
+
                 setHardwareStatus({
-                    nfc: data.hardware?.nfc || "online",
-                    gsm: data.hardware?.gsm || "online",
-                    raspberrypi: data.hardware?.pi || "online"
+                    nfc: data.hardware?.nfc,
+                    gsm: data.hardware?.gsm,
+                    raspberrypi: data.hardware?.pi
                 });
+
             } catch (err) {
                 console.error("Health poll failed", err);
             }
@@ -56,6 +58,10 @@ export default function HospitalDashboard() {
             clearInterval(nfcInterval);
         };
     }, [patient, isAutoFetching, setPatient]);
+
+    if (!stats) {
+        return <div className="p-8 text-white">Loading system status...</div>;
+    }
 
     return (
         <div className="p-8 space-y-8 bg-slate-50 dark:bg-slate-950 min-h-full">
@@ -142,7 +148,7 @@ export default function HospitalDashboard() {
                 <div className="lg:col-span-2">
                     <PatientFlowChart stats={stats} />
                 </div>
-                <SystemHealth hardwareStatus={hardwareStatus} />
+                <SystemHealth hardwareStatus={hardwareStatus} stats={stats} />
             </section>
 
         </div>
@@ -210,12 +216,28 @@ function PatientFlowChart({ stats }) {
     );
 }
 
-function SystemHealth({ hardwareStatus }) {
+function SystemHealth({ hardwareStatus, stats }) {
     const services = [
-        { name: "NFC Gateway", status: hardwareStatus?.nfc === "connected" ? "Online" : "Offline", latency: "12ms" },
-        { name: "Database", status: "Online", latency: "45ms" },
-        { name: "GSM Module", status: hardwareStatus?.gsm === "online" ? "Online" : "Offline", latency: "22ms" },
-        { name: "Raspberry Pi", status: hardwareStatus?.raspberrypi === "online" ? "Active" : "Offline", latency: "---" }
+        {
+            name: "NFC Gateway",
+            status: hardwareStatus?.nfc === "connected" ? "Online" : "Offline",
+            latency: stats?.latency?.nfc ? stats.latency.nfc + "ms" : "---"
+        },
+        {
+            name: "Database",
+            status: stats?.database === "online" ? "Online" : "Offline",
+            latency: stats?.latency?.db ? stats.latency.db + "ms" : "---"
+        },
+        {
+            name: "GSM Module",
+            status: hardwareStatus?.gsm === "connected" ? "Online" : "Offline",
+            latency: stats?.latency?.gsm ? stats.latency.gsm + "ms" : "---"
+        },
+        {
+            name: "Raspberry Pi",
+            status: hardwareStatus?.raspberrypi === "online" ? "Active" : "Offline",
+            latency: "---"
+        }
     ];
 
     return (
@@ -225,7 +247,7 @@ function SystemHealth({ hardwareStatus }) {
                 {services.map((s, i) => (
                     <div key={i} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
                         <div className="flex items-center gap-3">
-                            <div className={`size-2 rounded-full ${s.status === 'Online' ? 'bg-emerald-500' : 'bg-orange-500 animate-pulse'}`}></div>
+                            <div className={`size-2 rounded-full ${s.status === 'Online' || s.status === 'Active' ? 'bg-emerald-500' : 'bg-orange-500 animate-pulse'}`}></div>
                             <div>
                                 <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{s.name}</p>
                                 <p className="text-[10px] text-slate-500 dark:text-slate-400">{s.status}</p>
