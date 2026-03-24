@@ -6,27 +6,14 @@ import { useAuth } from "../../../auth/AuthProvider";
 
 export default function Step3Medical() {
     const { user } = useAuth();
-    const { data, update } = usePatientRegistration();
+    const { data } = usePatientRegistration();
     const navigate = useNavigate();
 
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [nfcStatus, setNfcStatus] = useState("📡 Waiting for NFC tap...");
+    const [nfcStatus, setNfcStatus] = useState("📡 Ready to link Smart-ID card");
 
-    // ✅ FETCH REAL NFC FROM BACKEND
     useEffect(() => {
-        const interval = setInterval(() => {
-            fetch(`${import.meta.env.VITE_API_URL}/api/nfc`)
-                .then(res => res.json())
-                .then(res => {
-                    if (res.nfcId) {
-                        update("nfcId", res.nfcId);
-                        setNfcStatus(`✅ Linked: ${res.nfcId}`);
-                    }
-                })
-                .catch(err => console.log("NFC fetch error:", err));
-        }, 2000);
-
-        return () => clearInterval(interval);
+        setNfcStatus("📡 Ready to link Smart-ID card");
     }, []);
 
     const complete = async (e) => {
@@ -37,33 +24,67 @@ export default function Step3Medical() {
             const formData = new FormData(e.target);
             const medicalData = Object.fromEntries(formData.entries());
 
+            // 🔥 STEP 1: START HARDWARE PROCESS
+            setNfcStatus("👆 Scan fingerprint → then tap NFC card...");
+
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 25000); // 25 sec timeout
+
+            const res = await fetch("http://192.168.1.5:5001/start-registration", {
+                method: "GET",
+                signal: controller.signal
+            });
+
+            clearTimeout(timeout);
+
+            const deviceData = await res.json();
+
+            // 🔥 ERROR HANDLING
+            if (deviceData.error) {
+                throw new Error(deviceData.error);
+            }
+
+            if (!deviceData.fingerprintId || !deviceData.nfcId) {
+                throw new Error("Invalid hardware response");
+            }
+
+            // 🔥 SUCCESS UI UPDATE
+            setNfcStatus(`✅ Card Linked: ${deviceData.nfcId}`);
+
+            // 🔥 STEP 2: COMBINE ALL DATA
             const payload = {
                 ...data.personal,
                 ...data.contact,
                 ...medicalData,
                 hospitalId: user?.id,
-                nfcId: data.nfcId || null,
+                fingerprintId: deviceData.fingerprintId,
+                nfcId: deviceData.nfcId
             };
 
-            if (!payload.nfcId) {
-                alert("Please tap an NFC card before completing registration.");
-                setIsSubmitting(false);
-                return;
-            }
-
+            // 🔥 STEP 3: SEND TO BACKEND
             const response = await hospitalAPI.registerPatient(payload);
 
+            // 🔥 STEP 4: NAVIGATE SUCCESS
             navigate("/hospital/register/success", {
                 state: {
-                    patientName: response.data.fullName,
+                    patientName:
+                        response.data.fullName ||
+                        `${data.personal.firstName} ${data.personal.lastName}`,
                     patientId: response.data.patientId,
-                    nfcId: response.data.nfcId || payload.nfcId,
+                    nfcId: response.data.nfcId || payload.nfcId
                 }
             });
 
         } catch (err) {
             console.error(err);
-            alert("Registration failed");
+
+            if (err.name === "AbortError") {
+                alert("⏳ Timeout: Please scan faster and try again");
+            } else {
+                alert("❌ " + err.message);
+            }
+
+            setNfcStatus("❌ Failed. Try again.");
         } finally {
             setIsSubmitting(false);
         }
@@ -77,13 +98,17 @@ export default function Step3Medical() {
         <div className="space-y-6">
 
             <div>
-                <h3 className="text-xl font-bold text-white mb-1">Medical Info & NFC Card</h3>
-                <p className="text-sm text-gray-400">Critical medical data and physical card linking.</p>
+                <h3 className="text-xl font-bold text-white mb-1">
+                    Medical Info & Smart-ID Card
+                </h3>
+                <p className="text-sm text-gray-400">
+                    Add medical details and link fingerprint + NFC card.
+                </p>
             </div>
 
             <form onSubmit={complete} className="space-y-4">
 
-                {/* 🔥 FIXED INPUT STYLES (VISIBLE TEXT) */}
+                {/* MEDICAL INPUTS */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
                     <div>
@@ -91,7 +116,7 @@ export default function Step3Medical() {
                         <select
                             name="bloodGroup"
                             defaultValue={data.medical.bloodGroup || "A+"}
-                            className="w-full px-4 py-3 rounded-xl bg-gray-900 text-white border border-gray-700 focus:ring-2 focus:ring-emerald-500"
+                            className="w-full px-4 py-3 rounded-xl bg-gray-900 text-white border border-gray-700"
                         >
                             <option>A+</option>
                             <option>A-</option>
@@ -135,23 +160,23 @@ export default function Step3Medical() {
                     />
                 </div>
 
-                {/* ✅ REAL NFC SECTION */}
+                {/* 🔥 HARDWARE STATUS UI */}
                 <div className="mt-8 p-6 rounded-2xl bg-gray-900 border-2 border-dashed border-emerald-500 text-center">
-
                     <div className="flex flex-col items-center gap-4">
 
                         <div className="size-16 rounded-full bg-emerald-500 text-white flex items-center justify-center animate-pulse">
-                            <span className="material-symbols-outlined text-4xl">contactless</span>
+                            <span className="material-symbols-outlined text-4xl">
+                                contactless
+                            </span>
                         </div>
 
                         <h4 className="font-bold text-emerald-400">
-                            {data.nfcId ? `✅ Linked: ${data.nfcId}` : nfcStatus}
+                            {nfcStatus}
                         </h4>
 
                         <p className="text-xs text-gray-500 uppercase">
-                            Tap Smart-ID card to link profile
+                            Fingerprint → NFC → Auto Link
                         </p>
-
                     </div>
                 </div>
 
@@ -171,7 +196,7 @@ export default function Step3Medical() {
                         disabled={isSubmitting}
                         className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl"
                     >
-                        {isSubmitting ? "Registering..." : "Complete Registration"}
+                        {isSubmitting ? "Processing Hardware..." : "Complete Registration"}
                     </button>
 
                 </div>

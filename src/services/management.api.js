@@ -1,7 +1,7 @@
 import api from "../services/api";
 
 const hospitalAPI = {
-    registerPatient: (payload) => api.post("/auth/register", payload),
+    registerPatient: (payload) => api.post("/register", payload),
 
     // Patient Session & NFC
     getPatientByNfc: (nfcId) => api.get(`/nfc/patient/${nfcId}`),
