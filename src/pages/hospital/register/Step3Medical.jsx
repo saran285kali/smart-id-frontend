@@ -18,17 +18,20 @@ export default function Step3Medical() {
 
     const complete = async (e) => {
         e.preventDefault();
+        if (isSubmitting) return;
+
         setIsSubmitting(true);
 
         try {
             const formData = new FormData(e.target);
             const medicalData = Object.fromEntries(formData.entries());
 
-            // 🔥 STEP 1: START HARDWARE PROCESS
-            setNfcStatus("👆 Scan fingerprint → then tap NFC card...");
+            // ✅ 1. SHOW CLEAR USER INSTRUCTIONS
+            setNfcStatus("👆 Place finger → then tap NEW card");
 
+            // ✅ 2. START HARDWARE PROCESS
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 25000); // 25 sec timeout
+            const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
             const res = await fetch("http://192.168.1.5:5001/start-registration", {
                 method: "GET",
@@ -36,22 +39,28 @@ export default function Step3Medical() {
             });
 
             clearTimeout(timeout);
-
             const deviceData = await res.json();
 
-            // 🔥 ERROR HANDLING
+            // ✅ 3. HANDLE HARDWARE ERRORS (DUPLICATE FINGERPRINT)
             if (deviceData.error) {
-                throw new Error(deviceData.error);
+                if (deviceData.error === "Finger already exists") {
+                    alert("⚠️ This fingerprint is already registered!");
+                } else {
+                    alert("❌ Hardware Error: " + deviceData.error);
+                }
+                setNfcStatus("❌ Hardware failed. Try again.");
+                setIsSubmitting(false);
+                return; // STOP: DO NOT CONTINUE ON HARDWARE ERROR
             }
 
             if (!deviceData.fingerprintId || !deviceData.nfcId) {
                 throw new Error("Invalid hardware response");
             }
 
-            // 🔥 SUCCESS UI UPDATE
-            setNfcStatus(`✅ Card Linked: ${deviceData.nfcId}`);
+            // ✅ 4. SUCCESS FEEDBACK
+            setNfcStatus(`✅ Linked: ${deviceData.nfcId}`);
 
-            // 🔥 STEP 2: COMBINE ALL DATA
+            // ✅ 5. COMBINE ALL DATA
             const payload = {
                 ...data.personal,
                 ...data.contact,
@@ -61,10 +70,10 @@ export default function Step3Medical() {
                 nfcId: deviceData.nfcId
             };
 
-            // 🔥 STEP 3: SEND TO BACKEND
+            // ✅ 6. SEND TO BACKEND
             const response = await hospitalAPI.registerPatient(payload);
 
-            // 🔥 STEP 4: NAVIGATE SUCCESS
+            // ✅ 7. SUCCESS NAVIGATION
             navigate("/hospital/register/success", {
                 state: {
                     patientName:
@@ -77,13 +86,11 @@ export default function Step3Medical() {
 
         } catch (err) {
             console.error(err);
-
             if (err.name === "AbortError") {
                 alert("⏳ Timeout: Please scan faster and try again");
             } else {
-                alert("❌ " + err.message);
+                alert("❌ Registration failed: " + err.message);
             }
-
             setNfcStatus("❌ Failed. Try again.");
         } finally {
             setIsSubmitting(false);
