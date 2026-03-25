@@ -26,72 +26,71 @@ export default function Step3Medical() {
             const formData = new FormData(e.target);
             const medicalData = Object.fromEntries(formData.entries());
 
-            // ✅ 1. SHOW CLEAR USER INSTRUCTIONS
-            setNfcStatus("👆 Place finger → then tap NEW card");
+            // ✅ 1. TRIGGER HARDWARE (Scanning fingerprint... then Tap NFC card...)
+            setNfcStatus("👆 Scanning fingerprint... please wait");
 
-            // ✅ 2. START HARDWARE PROCESS
             const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+            const timeout = setTimeout(() => controller.abort(), 35000); // 35s timeout
 
-            const res = await fetch("http://192.168.1.5:5001/start-registration", {
+            // Note: Hardware IP is typically local (e.g. 192.168.1.5)
+            const piRes = await fetch("http://192.168.1.5:5001/start-registration", {
                 method: "GET",
                 signal: controller.signal
             });
 
             clearTimeout(timeout);
-            const deviceData = await res.json();
+            const piData = await piRes.json();
 
-            // ✅ 3. HANDLE HARDWARE ERRORS (DUPLICATE FINGERPRINT)
-            if (deviceData.error) {
-                if (deviceData.error === "Finger already exists") {
-                    alert("⚠️ This fingerprint is already registered!");
-                } else {
-                    alert("❌ Hardware Error: " + deviceData.error);
-                }
-                setNfcStatus("❌ Hardware failed. Try again.");
-                setIsSubmitting(false);
-                return; // STOP: DO NOT CONTINUE ON HARDWARE ERROR
+            // ✅ 2. HANDLE HARDWARE ERRORS
+            if (piData.error) {
+                setNfcStatus("❌ Error occurred in hardware");
+                throw new Error(piData.error);
             }
 
-            if (!deviceData.fingerprintId || !deviceData.nfcId) {
-                throw new Error("Invalid hardware response");
+            if (!piData.fingerprintId || !piData.nfcId) {
+                setNfcStatus("❌ Missing Fingerprint/NFC data");
+                throw new Error("Missing Fingerprint or NFC ID from hardware");
             }
 
-            // ✅ 4. SUCCESS FEEDBACK
-            setNfcStatus(`✅ Linked: ${deviceData.nfcId}`);
-
-            // ✅ 5. COMBINE ALL DATA
-            const payload = {
+            // ✅ 3. MERGE HARDWARE DATA WITH FORM DATA
+            setNfcStatus("✅ Hardware Linked. Finalizing...");
+            const finalData = {
                 ...data.personal,
                 ...data.contact,
                 ...medicalData,
                 hospitalId: user?.id,
-                fingerprintId: deviceData.fingerprintId,
-                nfcId: deviceData.nfcId
+                fingerprintId: piData.fingerprintId,
+                nfcId: piData.nfcId
             };
 
-            // ✅ 6. SEND TO BACKEND
-            const response = await hospitalAPI.registerPatient(payload);
+            // ✅ 4. SEND FINAL DATA TO BACKEND
+            const response = await hospitalAPI.registerPatient(finalData);
 
-            // ✅ 7. SUCCESS NAVIGATION
+            // ✅ 5. PROVIDE USER FEEDBACK
+            setNfcStatus("✅ Registration successful");
+
+            // Navigate to success page
             navigate("/hospital/register/success", {
                 state: {
                     patientName:
                         response.data.fullName ||
                         `${data.personal.firstName} ${data.personal.lastName}`,
                     patientId: response.data.patientId,
-                    nfcId: response.data.nfcId || payload.nfcId
+                    nfcId: response.data.nfcId || finalData.nfcId
                 }
             });
 
         } catch (err) {
             console.error(err);
             if (err.name === "AbortError") {
-                alert("⏳ Timeout: Please scan faster and try again");
+                alert("⏳ Hardware Timeout: Please scan faster and try again.");
+                setNfcStatus("❌ Timeout Error");
             } else {
-                alert("❌ Registration failed: " + err.message);
+                alert(err.message === "Finger already exists" 
+                    ? "⚠️ This fingerprint is already registered!" 
+                    : "❌ " + err.message);
+                setNfcStatus("❌ Error occurred");
             }
-            setNfcStatus("❌ Failed. Try again.");
         } finally {
             setIsSubmitting(false);
         }
