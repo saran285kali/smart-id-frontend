@@ -35,10 +35,11 @@ export default function Step3Medical() {
             // Note: Hardware IP is typically local (e.g. 192.168.1.5)
             const piRes = await fetch("https://philologic-practicedly-shera.ngrok-free.dev/start-registration", {
                 method: "GET",
-                signal: controller.signal
+                headers: {
+                    "ngrok-skip-browser-warning": "true"
+                }
             });
 
-            clearTimeout(timeout);
             const piData = await piRes.json();
 
             // ✅ 2. HANDLE HARDWARE ERRORS
