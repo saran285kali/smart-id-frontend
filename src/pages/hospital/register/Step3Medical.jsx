@@ -33,7 +33,7 @@ export default function Step3Medical() {
             const timeout = setTimeout(() => controller.abort(), 35000); // 35s timeout
 
             // Note: Hardware IP is typically local (e.g. 192.168.1.5)
-            const piRes = await fetch("http://192.168.1.5:5001/start-registration", {
+            const piRes = await fetch("https://philologic-practicedly-shera.ngrok-free.dev/start-registration", {
                 method: "GET",
                 signal: controller.signal
             });
@@ -86,8 +86,8 @@ export default function Step3Medical() {
                 alert("⏳ Hardware Timeout: Please scan faster and try again.");
                 setNfcStatus("❌ Timeout Error");
             } else {
-                alert(err.message === "Finger already exists" 
-                    ? "⚠️ This fingerprint is already registered!" 
+                alert(err.message === "Finger already exists"
+                    ? "⚠️ This fingerprint is already registered!"
                     : "❌ " + err.message);
                 setNfcStatus("❌ Error occurred");
             }
